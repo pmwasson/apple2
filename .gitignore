@@ -1,4 +1,1 @@
-
-*.apple2
-build/hello.dsk
-*.txt
+build/*.
