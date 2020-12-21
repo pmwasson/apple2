@@ -9,11 +9,13 @@ PITCH           = $50
 .segment "CODE"
 
 .proc main
-    jsr     $FC58
+    jsr     HOME        ; clear screen
 
+    ; display a greeting
     jsr     inline_print
     .byte   "Hello world!",13,"Hit a key to stop tone...",13,0
 
+    ; make a noise
 top:
     ldx     #PITCH
 
