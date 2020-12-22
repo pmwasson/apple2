@@ -13,13 +13,16 @@ WIDTH_BYTES     =   4
 HEIGHT_BYTES    =   16
 WIDTH           =   WIDTH_BYTES*7
 HEIGHT          =   HEIGHT_BYTES
+LENGTH          =   WIDTH_BYTES * HEIGHT_BYTES
 
 ;------------------------------------------------
 ; Zero page usage
 ;------------------------------------------------
 
-screenPtr0  :=  $52
+screenPtr0  :=  $52     ; Screen pointer
 screenPtr1  :=  $53
+tilePtr0    :=  $54     ; Tile pointer
+tilePtr1    :=  $55
 
 ;-----------------------------------------------------------------------------
 ; Main
@@ -34,6 +37,12 @@ screenPtr1  :=  $53
     lda     #23         ; put cursor on last line
     sta     CV
     jsr     VTAB
+
+    ; Initialize tilePtr
+    lda     sheetStart
+    sta     tilePtr0
+    lda     sheetStart+1
+    sta     tilePtr1
 
     ; display a greeting
     jsr     inline_print
@@ -54,7 +63,7 @@ command_loop:
     cmp     #$95
     bne     :+
     jsr     inline_print
-    .byte   "Right X=",0
+    .byte   "Right ",0
     inc     curX
     lda     #WIDTH
     cmp     curX
@@ -62,10 +71,7 @@ command_loop:
     lda     #0
     sta     curX
 right_good:
-    lda     curX
-    jsr     PRBYTE
-    jsr     CR
-    jmp     command_loop
+    jmp     display_cord
 :
     ;------------------
     ; LEFT (arrow)
@@ -73,17 +79,14 @@ right_good:
     cmp     #$88
     bne     :+
     jsr     inline_print
-    .byte   "Left  X=",0
+    .byte   "Left  ",0
     dec     curX
     lda     curX
     bpl     left_good
     lda     #WIDTH-1
     sta     curX
 left_good:
-    lda     curX
-    jsr     PRBYTE
-    jsr     CR
-    jmp     command_loop
+    jmp     display_cord
 :
     ;------------------
     ; UP (arrow)
@@ -91,17 +94,14 @@ left_good:
     cmp     #$8B
     bne     :+
     jsr     inline_print
-    .byte   "Up    Y=",0
+    .byte   "Up    ",0
     dec     curY
     lda     curY
     bpl     up_good
     lda     #HEIGHT-1
     sta     curY
 up_good:
-    lda     curY
-    jsr     PRBYTE
-    jsr     CR
-    jmp     command_loop
+    jmp     display_cord
 :
     ;------------------
     ; DOWN (arrow)
@@ -109,7 +109,7 @@ up_good:
     cmp     #$8A
     bne     :+
     jsr     inline_print
-    .byte   "Down  Y=",0
+    .byte   "Down  ",0
     inc     curY
     lda     #HEIGHT
     cmp     curY
@@ -117,10 +117,7 @@ up_good:
     lda     #0
     sta     curY
 down_good:
-    lda     curY
-    jsr     PRBYTE
-    jsr     CR
-    jmp     command_loop
+    jmp     display_cord
 :
     ;------------------
     ; Q = QUIT
@@ -136,7 +133,7 @@ down_good:
     ;------------------
     ; ? = HELP
     ;------------------
-    cmp     #$80 | '?'
+    cmp     #$80 + '?'
     bne     :+
     jsr     inline_print
     .byte   "HELP",13,"(Arrows) Move,(Q)uit,(?)HELP",13,0
@@ -148,6 +145,26 @@ down_good:
     ;------------------
     jsr     inline_print
     .byte   "Unknown command (? for help)",13,0
+    jmp     command_loop
+
+display_cord:
+    jsr     inline_print
+    .byte   "X,Y=",0
+    lda     curX
+    jsr     PRBYTE
+    lda     #$80 + ','
+    jsr     COUT
+    lda     curY
+    jsr     PRBYTE
+    jsr     inline_print
+    .byte   " @ ",0
+    jsr     getByteOffset
+    jsr     PRBYTE
+    lda     #$80 + '.'
+    jsr     COUT
+    jsr     getBitOffset
+    jsr     PRBYTE
+    jsr     CR
     jmp     command_loop
 
 .endproc ; main  
@@ -243,8 +260,68 @@ pixel_loop:
     bne     pixel_loop
     rts
 
+; local variables
 color:      .byte   0
 
+.endproc
+
+;-----------------------------------------------------------------------------
+; getByteOffset
+;   Return byte offset in A based on curX, curY 
+;   WARNING: assumes width of 4, should generalize
+;-----------------------------------------------------------------------------
+.proc getByteOffset
+    lda     curY
+    asl
+    asl             ; y*4
+    sta     tempY
+    ldx     #3      ; 3
+    lda     curX
+    cmp     #7*3
+    bpl     addX
+    dex             ; 2
+    cmp     #7*2
+    bpl     addX
+    dex             ; 1
+    cmp     #7*1
+    bpl     addX
+    dex
+addX:
+    txa
+    clc
+    adc     tempY
+    rts
+
+; local variables
+tempY:  .byte   0
+
+.endProc
+
+;-----------------------------------------------------------------------------
+; getBitOffset
+;   Return bit offset in A based on curX 
+;-----------------------------------------------------------------------------
+.proc getBitOffset
+    lda     curX
+loop:
+    cmp     #7
+    bpl     continue
+    rts
+continue:
+    sec
+    sbc     #7
+    jmp     loop
+.endProc
+
+;-----------------------------------------------------------------------------
+; getTileByte
+;   Return byte based on tilePtr, curX, curY 
+;-----------------------------------------------------------------------------
+.proc getTileByte
+    jsr     getByteOffset
+    tay
+    lda     (tilePtr0),y
+    rts
 .endproc
 
 ;-----------------------------------------------------------------------------
@@ -253,10 +330,8 @@ color:      .byte   0
 
 curX:       .byte   0       
 curY:       .byte   0       
-pixel:      .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ; max size 4*16 = 64
-            .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-            .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-            .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+sheetStart: .word   exampleStart
+sheetEnd:   .word   exampleEnd
 
 ;-----------------------------------------------------------------------------
 ; Data
@@ -316,3 +391,14 @@ lineOffset:
 
 ; add utilies
 .include "inline_print.asm"
+
+; Put example tile last (in case user extends)
+; and align
+
+.align  LENGTH
+exampleStart:   
+    .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ; max size 4*16 = 64
+    .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+exampleEnd:
