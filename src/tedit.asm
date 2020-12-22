@@ -48,6 +48,14 @@ tilePtr1    :=  $55
     jsr     inline_print
     .byte   "Tile editor v0.1",13,0
 
+    ; Draw tile
+    jsr     drawTile
+
+    ; Init cursor
+    lda     #2
+    sta     curX
+    sta     curY
+
 command_loop:
 
     jsr     inline_print
@@ -183,7 +191,7 @@ cursor_loop:
     ; Display cursor
     lda     #$FF
     jsr     COUT
-    lda     #$55
+    jsr     getColor
     jsr     drawPixel
 
     ; Wait (on)
@@ -197,7 +205,7 @@ cursor_loop:
     jsr     COUT
     lda     #$88        ; backspace
     jsr     COUT
-    lda     #$00
+    jsr     getBWColor
     jsr     drawPixel
 
     ; check for keypress
@@ -325,6 +333,92 @@ continue:
 .endproc
 
 ;-----------------------------------------------------------------------------
+; getTileBit
+;   Return bit in A and Z flag based on tilePtr, curX, curY 
+;-----------------------------------------------------------------------------
+.proc getTileBit
+    jsr     getBitOffset
+    sta     tileBit
+    jsr     getTileByte
+    ldx     tileBit
+    beq     exit
+bit_loop:
+    lsr
+    dex
+    bne     bit_loop
+exit:
+    and     #1  ; one-bit and set Z flag
+    rts
+
+; local variable
+tileBit:    .byte   0
+
+.endproc
+
+
+;-----------------------------------------------------------------------------
+; getBWColor
+;-----------------------------------------------------------------------------
+
+.proc getBWColor
+    jsr     getTileBit
+    bne     bitOne
+    lda     #$00
+    beq     exit
+bitOne:
+    lda     #$7f
+exit:
+    rts
+.endproc
+
+;-----------------------------------------------------------------------------
+; getColor
+; Note - base on position, not value.
+; Assumes alignment
+;-----------------------------------------------------------------------------
+
+.proc getColor
+    jsr     getTileByte
+    bmi     bitOne
+    lda     #$55
+    jmp     exit
+bitOne:
+    lda     #$D5
+exit:
+    rts
+.endproc
+
+;-----------------------------------------------------------------------------
+; drawTile
+;   Warning: clobbers curX, curY
+;-----------------------------------------------------------------------------
+
+.proc drawTile
+
+    ; init to zero
+    lda     #0
+    sta     curY
+yloop:
+    lda     #0
+    sta     curX
+xloop:
+    jsr     getBWColor
+    jsr     drawPixel    
+
+    inc     curX
+    lda     curX
+    cmp     #WIDTH
+    bmi     xloop
+
+    inc     curY
+    lda     curY
+    cmp     #HEIGHT
+    bne     yloop
+    rts
+
+.endproc
+
+;-----------------------------------------------------------------------------
 ; Global Variables
 ;-----------------------------------------------------------------------------
 
@@ -397,8 +491,20 @@ lineOffset:
 
 .align  LENGTH
 exampleStart:   
-    .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ; max size 4*16 = 64
-    .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte   $7f,$7f,$7f,$7f
+    .byte   $03,$55,$55,$60
+    .byte   $03,$55,$55,$60
+    .byte   $03,$55,$55,$60
+    .byte   $03,$2a,$2a,$60
+    .byte   $03,$2a,$2a,$60
+    .byte   $03,$2a,$2a,$60
+    .byte   $7f,$7f,$7f,$7f
+    .byte   $7f,$7f,$7f,$7f
+    .byte   $03,$d5,$d5,$60
+    .byte   $03,$d5,$d5,$60
+    .byte   $03,$d5,$d5,$60
+    .byte   $03,$aa,$aa,$60
+    .byte   $03,$aa,$aa,$60
+    .byte   $03,$aa,$aa,$60
+    .byte   $7f,$7f,$7f,$7f
 exampleEnd:
