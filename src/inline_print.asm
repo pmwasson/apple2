@@ -11,11 +11,9 @@
 ;   .byte   "HELLO WORLD!",0
 ;   <next instruction>
 
-;.include "defines.asm"
-
 ; Zero page usage
-stringPtr0      = $60
-stringPtr1      = $61
+stringPtr0      := $60
+stringPtr1      := $61
 
 .proc inline_print
     ; Pop return address to find string
