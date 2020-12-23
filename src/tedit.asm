@@ -14,7 +14,7 @@ HEIGHT_BYTES    =   16
 WIDTH           =   WIDTH_BYTES*7
 HEIGHT          =   HEIGHT_BYTES
 LENGTH          =   WIDTH_BYTES * HEIGHT_BYTES
-
+PREVIEW_ADRS    =   HGRPAGE1+WIDTH+2
 ;------------------------------------------------
 ; Zero page usage
 ;------------------------------------------------
@@ -48,8 +48,9 @@ tilePtr1    :=  $55
     jsr     inline_print
     .byte   "Tile editor v0.1",13,0
 
-    ; Draw tile
+    ; Set up screen
     jsr     drawTile
+    jsr     drawPreview
 
     ; Init cursor
     lda     #2
@@ -128,6 +129,40 @@ down_good:
     jmp     display_cord
 :
     ;------------------
+    ; SP = Toggle Bit
+    ;------------------
+    cmp     #$80 | ' '
+    bne     :+
+    jsr     inline_print
+    .byte   "Toggle Bit ",0
+    jsr     toggleBit
+    bne     toggle_bit_on
+    jsr     inline_print
+    .byte   "off",0
+    jmp     display_byte
+toggle_bit_on:
+    jsr     inline_print
+    .byte   "on ",0
+    jmp     display_byte
+:
+    ;------------------
+    ; C = Toggle Color
+    ;------------------
+    cmp     #$80 | 'C'
+    bne     :+
+    jsr     inline_print
+    .byte   "Toggle Color ",0
+    jsr     toggleColor
+    bne     toggle_color_on
+    jsr     inline_print
+    .byte   "purple/green",0
+    jmp     display_byte
+toggle_color_on:
+    jsr     inline_print
+    .byte   "blue/red    ",0
+    jmp     display_byte
+:
+    ;------------------
     ; Q = QUIT
     ;------------------
     cmp     #$80 | 'Q'
@@ -144,7 +179,7 @@ down_good:
     cmp     #$80 + '?'
     bne     :+
     jsr     inline_print
-    .byte   "HELP",13,"(Arrows) Move,(Q)uit,(?)HELP",13,0
+    .byte   "(?) HELP, (Q)uit",13,"  (Arrows) Move, (SP) Toggle Bit, Toggle (C)olor",13,0
     jmp     command_loop
 
 :
@@ -155,9 +190,10 @@ down_good:
     .byte   "Unknown command (? for help)",13,0
     jmp     command_loop
 
+; jump to after changing coordinates
 display_cord:
     jsr     inline_print
-    .byte   "X,Y=",0
+    .byte   "X/Y:",0
     lda     curX
     jsr     PRBYTE
     lda     #$80 + ','
@@ -173,6 +209,19 @@ display_cord:
     jsr     getBitOffset
     jsr     PRBYTE
     jsr     CR
+    jmp     command_loop
+
+; jump to after changing data
+display_byte:
+    jsr     inline_print
+    .byte   ": $",0
+    lda     curData
+    jsr     PRBYTE
+    jsr     CR
+
+    ; update preview
+    jsr     drawPreview
+
     jmp     command_loop
 
 .endproc ; main  
@@ -419,11 +468,121 @@ xloop:
 .endproc
 
 ;-----------------------------------------------------------------------------
+; drawPreview
+;-----------------------------------------------------------------------------
+
+.proc drawPreview
+
+    ; set screenPtr to fixed location
+    lda     #<PREVIEW_ADRS
+    sta     screenPtr0
+    lda     #>PREVIEW_ADRS
+    sta     screenPtr1
+
+    lda     tilePtr0    ; save a copy
+    pha
+
+    ldx     #HEIGHT_BYTES
+drawLoopV:
+    ldy     #0
+drawLoopH:
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    iny
+    cpy     #WIDTH_BYTES
+    bne     drawLoopH
+
+    clc
+    lda     tilePtr0
+    adc     #WIDTH_BYTES
+    sta     tilePtr0
+    ; assumes spritePtr aligned such that there are no page crossing
+
+    lda     screenPtr1
+    adc     #$04
+    sta     screenPtr1
+
+    ; check if in next byte
+    cmp     #>HGRPAGE2
+    bmi     continue
+
+    ; move to next byte
+    lda     screenPtr0
+    clc
+    adc     #$80
+    sta     screenPtr0
+    lda     screenPtr1
+    sbc     #$1f        ; subtract 20 if no carry, 19 if carry
+    sta     screenPtr1
+
+continue:
+    dex
+    bne     drawLoopV
+
+    ; restore tilePtr
+    pla
+    sta     tilePtr0
+
+    rts
+
+.endproc
+
+
+;-----------------------------------------------------------------------------
+; toggleBit
+;   Flip bit based on tilePtr, curX, curY
+;   Byte result in X, bit result on Z flag
+;-----------------------------------------------------------------------------
+.proc toggleBit
+    lda     #1
+    sta     shiftedBit
+    jsr     getBitOffset
+    tax
+    beq     continue
+    lda     #1
+shift_loop:
+    asl
+    dex
+    bne     shift_loop
+    sta     shiftedBit
+continue:
+    jsr     getByteOffset
+    tay
+    lda     (tilePtr0),y
+    eor     shiftedBit
+    sta     (tilePtr0),y
+    sta     curData
+    and     shiftedBit      ; set Z flag for return
+    rts
+
+; local variable
+shiftedBit: .byte   0
+
+.endproc
+
+;-----------------------------------------------------------------------------
+; toggleColor
+;   Flip color based on tilePtr, curX, curY 
+;   Byte result in X, bit result on Z flag
+;-----------------------------------------------------------------------------
+.proc toggleColor
+    jsr     getByteOffset
+    tay
+    lda     (tilePtr0),y
+    eor     #$80
+    sta     (tilePtr0),y
+    sta     curData
+    and     #$80         ; set Z flag for return
+    rts
+.endproc
+
+;-----------------------------------------------------------------------------
 ; Global Variables
 ;-----------------------------------------------------------------------------
 
 curX:       .byte   0       
 curY:       .byte   0       
+curData:    .byte   0
 sheetStart: .word   exampleStart
 sheetEnd:   .word   exampleEnd
 
@@ -491,6 +650,7 @@ lineOffset:
 
 .align  LENGTH
 exampleStart:   
+    .byte   $00,$00,$00,$00
     .byte   $7f,$7f,$7f,$7f
     .byte   $03,$55,$55,$60
     .byte   $03,$55,$55,$60
@@ -503,7 +663,6 @@ exampleStart:
     .byte   $03,$d5,$d5,$60
     .byte   $03,$d5,$d5,$60
     .byte   $03,$d5,$d5,$60
-    .byte   $03,$aa,$aa,$60
     .byte   $03,$aa,$aa,$60
     .byte   $03,$aa,$aa,$60
     .byte   $7f,$7f,$7f,$7f
