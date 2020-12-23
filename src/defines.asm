@@ -16,6 +16,7 @@ HGRPAGE2        := $4000
 
 ; Soft switches
 SPEAKER         := $C030
+TEXTMODE 		:= $C01A	; Bit 7 is 1 if text mode
 
 ; ROM routines
 GR 				:= $F390	; Low-res mixed graphics mode

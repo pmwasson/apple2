@@ -44,10 +44,6 @@ tilePtr1    :=  $55
     lda     sheetStart+1
     sta     tilePtr1
 
-    ; display a greeting
-    jsr     inline_print
-    .byte   "Tile editor v0.1",13,0
-
     ; Set up screen
     jsr     drawTile
     jsr     drawPreview
@@ -57,11 +53,17 @@ tilePtr1    :=  $55
     sta     curX
     sta     curY
 
+version:
+    ; display a greeting
+    jsr     inline_print
+    .byte   "Tile editor v0.1",13,0
+
 command_loop:
 
     jsr     inline_print
     .byte   "Command:",0
 
+skip_prompt:
     jsr     getInput    ; Wait for a keypress
 
     ; Parse command
@@ -179,10 +181,77 @@ toggle_color_on:
     cmp     #$80 + '?'
     bne     :+
     jsr     inline_print
-    .byte   "(?) HELP, (Q)uit",13,"  (Arrows) Move, (SP) Toggle Bit, Toggle (C)olor",13,0
+    .byte   "(?) HELP, (Q)uit",13,"  (Arrows) Move, (SP) Toggle Bit,",13,"  Toggle (C)olor",13,0
     jmp     command_loop
 
 :
+
+    ;------------------
+    ; ESC = Toggle Text
+    ;------------------
+    cmp     #$9b
+    bne     :+
+    ; dont display anything
+    lda     TEXTMODE
+    bmi     toggle_text_off
+    bit     TXTSET    
+    jmp     skip_prompt
+toggle_text_off:
+    bit     TXTCLR    
+    jmp     skip_prompt
+:
+
+
+    ;------------------
+    ; D = Dump
+    ;------------------
+    cmp     #$80 + 'D' 
+    bne     :+
+    jsr     inline_print
+    .byte   "Dump",13,0
+
+    ldx     tilePtr0
+    ldy     tilePtr1
+    jsr     PRINTXY
+    jsr     inline_print
+    .byte   ": ",0
+
+    lda     #0
+    sta     dump_count
+dump_loop:
+    lda     #$80 + '$'
+    jsr     COUT
+    ldy     dump_count
+    lda     (tilePtr0),y
+    jsr     PRBYTE
+    inc     dump_count
+    lda     dump_count
+    cmp     #LENGTH
+    beq     dump_finish
+    lda     #$80 + ','
+    jsr     COUT
+    lda     dump_count
+    and     #$7
+    bne     dump_loop
+    jsr     inline_print
+    .byte   13,"      ",0
+    jmp     dump_loop
+
+dump_finish:
+    jsr     CR
+    jmp     command_loop
+:
+
+    ;------------------
+    ; V = Version
+    ;------------------
+    cmp     #$80 + 'V' 
+    bne     :+
+    jsr     inline_print
+    .byte   "Version",13,0
+    jmp     version
+:
+
     ;------------------
     ; Unknown
     ;------------------
@@ -223,6 +292,10 @@ display_byte:
     jsr     drawPreview
 
     jmp     command_loop
+
+; Local variables
+
+dump_count: .byte   0
 
 .endproc ; main  
 
