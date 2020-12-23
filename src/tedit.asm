@@ -44,14 +44,7 @@ tilePtr1    :=  $55
     lda     sheetStart+1
     sta     tilePtr1
 
-    ; Set up screen
-    jsr     drawTile
-    jsr     drawPreview
-
-    ; Init cursor
-    lda     #2
-    sta     curX
-    sta     curY
+    jsr     refresh
 
 version:
     ; display a greeting
@@ -187,6 +180,54 @@ toggle_color_on:
 :
 
     ;------------------
+    ; F = FILL
+    ;------------------
+    cmp     #$80 + 'F'
+    beq     continue_fill
+    jmp     :+              ; too far due to long string
+continue_fill:
+    jsr     inline_print
+    .byte   "Fill - WARNING: Clears tile!",13
+    .byte   "Choose color (0/4=black,1=green,",13
+    .byte   "2=purple,3/7=white,5=orange,6=blue,",13
+    .byte   "other=cancel):",0
+    jsr     getInput
+    cmp     #$80 + '0'
+    bmi     cancel_fill
+    cmp     #$80 + '8'
+    bpl     cancel_fill
+    jsr     COUT
+    sec
+    sbc     #$80 + '0'
+    tax
+    lda     fill_color_even,x
+    sta     even_fill
+    lda     fill_color_odd,x
+    sta     odd_fill
+    ldy     #0
+fill_loop:
+    lda     even_fill
+    sta     (tilePtr0),y
+    iny
+    lda     odd_fill
+    sta     (tilePtr0),y
+    iny
+    cpy     #LENGTH
+    bne     fill_loop
+    jsr     CR
+    jsr     refresh
+    jmp     command_loop
+
+cancel_fill:
+    jsr     inline_print
+    .byte   "Cancel",13,0
+    jmp     command_loop
+
+:
+
+
+
+    ;------------------
     ; ESC = Toggle Text
     ;------------------
     cmp     #$9b
@@ -295,9 +336,29 @@ display_byte:
 
 ; Local variables
 
-dump_count: .byte   0
+dump_count:     ; share with fill color
+even_fill:      .byte   0
+odd_fill:       .byte   0
 
 .endproc ; main  
+
+;-----------------------------------------------------------------------------
+; refresh
+;   Redraw screen and set cursor
+;-----------------------------------------------------------------------------
+.proc refresh
+
+    ; Set up screen
+    jsr     drawTile
+    jsr     drawPreview
+
+    ; Init cursor
+    lda     #0
+    sta     curX
+    sta     curY
+
+    rts
+.endproc
 
 ;-----------------------------------------------------------------------------
 ; getInput
@@ -714,6 +775,26 @@ lineOffset:
     .byte   <$22D0
     .byte   <$2350
     .byte   <$23D0
+
+fill_color_even:
+    .byte   $00     ; 0 Black
+    .byte   $2A     ; 1 Green   - flip on odd bytes
+    .byte   $55     ; 2 Purple  - flip on odd bytes
+    .byte   $7F     ; 3 White
+    .byte   $80     ; 4 Black
+    .byte   $AA     ; 5 Orange  - flip on odd bytes
+    .byte   $D5     ; 6 Blue    - flip on odd bytes
+    .byte   $FF     ; 7 White
+
+fill_color_odd:
+    .byte   $00     ; 0 Black
+    .byte   $55     ; 1 Green   - flip on odd bytes
+    .byte   $2A     ; 2 Purple  - flip on odd bytes
+    .byte   $7F     ; 3 White
+    .byte   $80     ; 4 Black
+    .byte   $D5     ; 5 Orange  - flip on odd bytes
+    .byte   $AA     ; 6 Blue    - flip on odd bytes
+    .byte   $FF     ; 7 White
 
 ; add utilies
 .include "inline_print.asm"
