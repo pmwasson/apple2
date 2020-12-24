@@ -26,6 +26,9 @@ stringPtr1      := $61
     ; Print characters until 0 (end-of-string)
 printLoop:
     iny
+    bne     :+              ; Allow strings > 255
+    inc     stringPtr1
+:
     tya
     pha
     lda     (stringPtr0),y

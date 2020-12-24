@@ -29,7 +29,7 @@ tilePtr1    :=  $55
 ;-----------------------------------------------------------------------------
 
 .segment "CODE"
-.org    $6000
+.org    $4000
 
 .proc main
     jsr     HGR         ; hi-res mixed mode
@@ -49,12 +49,14 @@ tilePtr1    :=  $55
 version:
     ; display a greeting
     jsr     inline_print
-    .byte   "Tile editor v0.1",13,0
+    .byte   "Tile editor v0.1 - ? for help",13,0
 
 command_loop:
 
     jsr     inline_print
     .byte   "Command:",0
+    lda     tileNumber
+
 
 skip_prompt:
     jsr     getInput    ; Wait for a keypress
@@ -75,7 +77,7 @@ skip_prompt:
     lda     #0
     sta     curX
 right_good:
-    jmp     display_cord
+    jmp     finish_move
 :
     ;------------------
     ; LEFT (arrow)
@@ -90,7 +92,7 @@ right_good:
     lda     #WIDTH-1
     sta     curX
 left_good:
-    jmp     display_cord
+    jmp     finish_move
 :
     ;------------------
     ; UP (arrow)
@@ -105,7 +107,7 @@ left_good:
     lda     #HEIGHT-1
     sta     curY
 up_good:
-    jmp     display_cord
+    jmp     finish_move
 :
     ;------------------
     ; DOWN (arrow)
@@ -121,7 +123,7 @@ up_good:
     lda     #0
     sta     curY
 down_good:
-    jmp     display_cord
+    jmp     finish_move
 :
     ;------------------
     ; SP = Toggle Bit
@@ -174,11 +176,10 @@ toggle_color_on:
     cmp     #$80 + '?'
     bne     :+
     jsr     inline_print
-    .byte   "(?) HELP, (Q)uit",13,"  (Arrows) Move, (SP) Toggle Bit,",13,"  Toggle (C)olor",13,0
+    .byte   "Help (ESC when done)",13,0
+    jsr     print_help
     jmp     command_loop
-
 :
-
     ;------------------
     ; F = FILL
     ;------------------
@@ -188,17 +189,14 @@ toggle_color_on:
 continue_fill:
     jsr     inline_print
     .byte   "Fill - WARNING: Clears tile!",13
-    .byte   "Choose color (0/4=black,1=green,",13
-    .byte   "2=purple,3/7=white,5=orange,6=blue,",13
-    .byte   "other=cancel):",0
-    jsr     getInput
-    cmp     #$80 + '0'
-    bmi     cancel_fill
-    cmp     #$80 + '8'
-    bpl     cancel_fill
-    jsr     COUT
-    sec
-    sbc     #$80 + '0'
+    .byte   " Choose color (0/4=black,1=green,",13
+    .byte   " 2=purple,3/7=white,5=orange,6=blue,",13
+    .byte   " other=cancel):",0
+    lda     #$8
+    jsr     get_input_number
+    bpl     continue_fill2
+    jmp     command_loop
+continue_fill2:
     tax
     lda     fill_color_even,x
     sta     even_fill
@@ -217,16 +215,7 @@ fill_loop:
     jsr     CR
     jsr     refresh
     jmp     command_loop
-
-cancel_fill:
-    jsr     inline_print
-    .byte   "Cancel",13,0
-    jmp     command_loop
-
 :
-
-
-
     ;------------------
     ; ESC = Toggle Text
     ;------------------
@@ -241,15 +230,14 @@ toggle_text_off:
     bit     TXTCLR    
     jmp     skip_prompt
 :
-
-
     ;------------------
     ; D = Dump
     ;------------------
     cmp     #$80 + 'D' 
     bne     :+
+    bit     TXTSET
     jsr     inline_print
-    .byte   "Dump",13,0
+    .byte   "Dump (ESC when done)",13,0
 
     ldx     tilePtr0
     ldy     tilePtr1
@@ -284,16 +272,6 @@ dump_finish:
 :
 
     ;------------------
-    ; V = Version
-    ;------------------
-    cmp     #$80 + 'V' 
-    bne     :+
-    jsr     inline_print
-    .byte   "Version",13,0
-    jmp     version
-:
-
-    ;------------------
     ; Unknown
     ;------------------
     jsr     inline_print
@@ -301,7 +279,7 @@ dump_finish:
     jmp     command_loop
 
 ; jump to after changing coordinates
-display_cord:
+finish_move:
     jsr     inline_print
     .byte   "X/Y:",0
     lda     curX
@@ -318,6 +296,19 @@ display_cord:
     jsr     COUT
     jsr     getBitOffset
     jsr     PRBYTE
+
+    ; check if open apple (clear) is pressed
+    lda     BUTN0 
+    bpl     :+
+    jsr     clearBit
+    jmp     display_byte
+:
+    ; check if closed apple (set) is pressed
+    lda     BUTN1 
+    bpl     :+
+    jsr     setBit
+    jmp     display_byte
+:
     jsr     CR
     jmp     command_loop
 
@@ -341,6 +332,65 @@ even_fill:      .byte   0
 odd_fill:       .byte   0
 
 .endproc ; main  
+
+;-----------------------------------------------------------------------------
+; print_help
+;-----------------------------------------------------------------------------
+.proc print_help
+    bit     TXTSET
+    jsr     inline_print
+    .byte   " Arrows: Move cursor",13
+    .byte   " Arrows & open-apple: Clear bit",13
+    .byte   " Arrows & close-apple: Set bit",13
+    .byte   " Space: Toggle bit",13
+    .byte   " C: Toggle byte color",13
+    .byte   " F: Fill tile color",13
+    .byte   " R: *Rotate bits",13
+    .byte   " I: *Insert row/col",13
+    .byte   " X: *Delete row/col",13
+    .byte   " D: Dump bytes",13
+    .byte   " L: *Load tile set",13
+    .byte   " S: *Save tile set",13
+    .byte   " N: *New tile set",13
+    .byte   " -: *Go to previous tile",13
+    .byte   " =: *Go to next tile",13
+    .byte   " ?: HELP",13
+    .byte   " Q: Quit",13  
+    .byte   " Escape: Toggle text/graphics",13
+    .byte   "   * = unimplemented",13
+    .byte   0
+    rts
+.endproc
+
+
+;-----------------------------------------------------------------------------
+; get_input_number
+;   Get input for a number 0..max+1, where A == max+1
+;   Display number or cancel and return result in A (-1 for cancel)
+;-----------------------------------------------------------------------------
+.proc get_input_number
+    clc
+    adc     #$80 + '0'  ; convert A to ascii number
+    sta     max_digit     
+    jsr     getInput
+    cmp     #$80 + '0'
+    bmi     cancel
+    cmp     max_digit
+    bpl     cancel
+    jsr     COUT
+    sec
+    sbc     #$80 + '0'
+    rts
+cancel:
+    jsr     inline_print
+    .byte   "Cancel",13,0
+    lda     #$ff
+    rts
+
+; local variable
+max_digit:  .byte   0
+
+.endproc
 
 ;-----------------------------------------------------------------------------
 ; refresh
@@ -663,13 +713,10 @@ continue:
 
 
 ;-----------------------------------------------------------------------------
-; toggleBit
-;   Flip bit based on tilePtr, curX, curY
-;   Byte result in X, bit result on Z flag
+; bitMask
+;   Get mask of bit based on curX
 ;-----------------------------------------------------------------------------
-.proc toggleBit
-    lda     #1
-    sta     shiftedBit
+.proc bitMask
     jsr     getBitOffset
     tax
     beq     continue
@@ -679,7 +726,20 @@ shift_loop:
     dex
     bne     shift_loop
     sta     shiftedBit
+    rts
 continue:
+    lda     #1
+    rts
+.endproc
+
+;-----------------------------------------------------------------------------
+; toggleBit
+;   Flip bit based on tilePtr, curX, curY
+;   Byte result in curData, bit result on Z flag
+;-----------------------------------------------------------------------------
+.proc toggleBit
+    jsr     bitMask
+    sta     shiftedBit
     jsr     getByteOffset
     tay
     lda     (tilePtr0),y
@@ -688,10 +748,41 @@ continue:
     sta     curData
     and     shiftedBit      ; set Z flag for return
     rts
+.endproc
 
-; local variable
-shiftedBit: .byte   0
+;-----------------------------------------------------------------------------
+; clearBit
+;   Clear bit based on tilePtr, curX, curY
+;   Byte result in curData
+;-----------------------------------------------------------------------------
+.proc clearBit
+    jsr     bitMask
+    eor     #$FF            ; flip mask
+    sta     shiftedBit
+    jsr     getByteOffset
+    tay
+    lda     (tilePtr0),y
+    and     shiftedBit
+    sta     (tilePtr0),y
+    sta     curData
+    rts
+.endproc
 
+;-----------------------------------------------------------------------------
+; setBit
+;   Set bit based on tilePtr, curX, curY
+;   Byte result in curData
+;-----------------------------------------------------------------------------
+.proc setBit
+    jsr     bitMask
+    sta     shiftedBit
+    jsr     getByteOffset
+    tay
+    lda     (tilePtr0),y
+    ora     shiftedBit
+    sta     (tilePtr0),y
+    sta     curData
+    rts
 .endproc
 
 ;-----------------------------------------------------------------------------
@@ -717,8 +808,13 @@ shiftedBit: .byte   0
 curX:       .byte   0       
 curY:       .byte   0       
 curData:    .byte   0
-sheetStart: .word   exampleStart
-sheetEnd:   .word   exampleEnd
+tileNumber: .byte   0
+sheetStart: .word   $6000
+sheetEnd:   .word   $6000+LENGTH*64
+
+; Temporary
+shiftedBit: .byte   0
+
 
 ;-----------------------------------------------------------------------------
 ; Data
