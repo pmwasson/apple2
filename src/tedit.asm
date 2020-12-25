@@ -59,11 +59,11 @@ version:
 command_loop:
 
     jsr     inline_print
-    .byte   "Command[",0
+    .byte   "Tile ",0
     lda     tileIndex
     jsr     PRBYTE
     jsr     inline_print
-    .byte   "]:",0
+    .byte   ":",0
 
 skip_prompt:
     jsr     getInput    ; Wait for a keypress
@@ -73,7 +73,7 @@ skip_prompt:
     ;------------------
     ; RIGHT (arrow)
     ;------------------
-    cmp     #$95
+    cmp     #KEY_RIGHT
     bne     :+
     jsr     inline_print
     .byte   "Right ",0
@@ -89,7 +89,7 @@ right_good:
     ;------------------
     ; LEFT (arrow)
     ;------------------
-    cmp     #$88
+    cmp     #KEY_LEFT
     bne     :+
     jsr     inline_print
     .byte   "Left  ",0
@@ -104,7 +104,7 @@ left_good:
     ;------------------
     ; UP (arrow)
     ;------------------
-    cmp     #$8B
+    cmp     #KEY_UP
     bne     :+
     jsr     inline_print
     .byte   "Up    ",0
@@ -119,7 +119,7 @@ up_good:
     ;------------------
     ; DOWN (arrow)
     ;------------------
-    cmp     #$8A
+    cmp     #KEY_DOWN
     bne     :+
     jsr     inline_print
     .byte   "Down  ",0
@@ -135,7 +135,7 @@ down_good:
     ;------------------
     ; SP = Toggle Bit
     ;------------------
-    cmp     #$80 | ' '
+    cmp     #KEY_SPACE
     bne     :+
     jsr     inline_print
     .byte   "Toggle Bit ",0
@@ -226,7 +226,7 @@ fill_loop:
     ;------------------
     ; ESC = Toggle Text
     ;------------------
-    cmp     #$9b
+    cmp     #KEY_ESC
     bne     :+
     ; dont display anything
     lda     TEXTMODE
@@ -462,6 +462,47 @@ cancel:
 ; local variable
 max_digit:  .byte   0
 
+.endproc
+
+;-----------------------------------------------------------------------------
+; get_input_direction
+;   Get input for a number 0..max+1, where A == max+1
+;   Display number or cancel and return result in A (-1 for cancel)
+;-----------------------------------------------------------------------------
+.proc get_input_direction
+    jsr     getInput
+    cmp     #KEY_RIGHT
+    bne     :+
+    jsr     inline_print
+    .byte   "Right",13,0
+    lda     #0
+    rts
+:
+    cmp     #KEY_LEFT
+    bne     :+
+    jsr     inline_print
+    .byte   "Left ",13,0
+    lda     #1
+    rts
+:
+    cmp     #KEY_UP
+    bne     :+
+    jsr     inline_print
+    .byte   "Up   ",13,0
+    lda     #2
+    rts
+:
+    cmp     #KEY_DOWN
+    bne     :+
+    jsr     inline_print
+    .byte   "Down ",13,0
+    lda     #3
+    rts
+:
+    jsr     inline_print
+    .byte   "Cancel",13,0
+    LDA     #$FF
+    rts
 .endproc
 
 ;-----------------------------------------------------------------------------
