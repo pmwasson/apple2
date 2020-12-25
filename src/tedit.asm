@@ -59,9 +59,11 @@ version:
 command_loop:
 
     jsr     inline_print
-    .byte   "Command:",0
-    lda     tileNumber
-
+    .byte   "Command[",0
+    lda     tileIndex
+    jsr     PRBYTE
+    jsr     inline_print
+    .byte   "]:",0
 
 skip_prompt:
     jsr     getInput    ; Wait for a keypress
@@ -275,7 +277,72 @@ dump_finish:
     jsr     CR
     jmp     command_loop
 :
+    ;------------------
+    ; - = Previous
+    ;------------------
+    cmp     #$80 | '-'
+    bne     :+
+    jsr     inline_print
+    .byte   "Previous tile: ",0
 
+    lda     tileIndex
+    bne     previous_continue1
+
+    ; point to last tile + 1
+    lda     tileMax
+    sta     tileIndex
+    lda     #<example_end
+    sta     tilePtr0
+    lda     #>example_end
+    sta     tilePtr1
+
+previous_continue1:
+    dec     tileIndex
+    sec
+    lda     tilePtr0
+    sbc     #LENGTH
+    sta     tilePtr0
+    bcs     previous_continue2
+    dec     tilePtr1
+previous_continue2:
+    lda     tileIndex
+    jsr     PRBYTE
+    jsr     CR
+    jsr     refresh
+    jmp     command_loop
+:
+    ;------------------
+    ; = = Next
+    ;------------------
+    cmp     #$80 | '='
+    bne     :+
+    jsr     inline_print
+    .byte   "Next tile: ",0
+
+    inc     tileIndex
+    clc
+    lda     tilePtr0
+    adc     #LENGTH
+    sta     tilePtr0
+    bcc     next_continue1
+    inc     tilePtr1
+next_continue1:
+    lda     tileIndex
+    cmp     tileMax
+    bne     next_continue2
+    lda     #0
+    sta     tileIndex
+    lda     #<example_start
+    sta     tilePtr0
+    lda     #>example_start
+    sta     tilePtr1
+next_continue2:
+    lda     tileIndex
+    jsr     PRBYTE
+    jsr     CR
+    jsr     refresh
+    jmp     command_loop
+:
     ;------------------
     ; Unknown
     ;------------------
@@ -357,8 +424,8 @@ odd_fill:       .byte   0
     .byte   " L: *Load tile set",13
     .byte   " S: *Save tile set",13
     .byte   " N: *New tile set",13
-    .byte   " -: *Go to previous tile",13
-    .byte   " =: *Go to next tile",13
+    .byte   " -: Go to previous tile",13
+    .byte   " =: Go to next tile",13
     .byte   " ?: HELP",13
     .byte   " Q: Quit",13  
     .byte   " Escape: Toggle text/graphics",13
@@ -843,9 +910,10 @@ continue:
 curX:       .byte   0       
 curY:       .byte   0       
 curData:    .byte   0
-tileNumber: .byte   0
-sheetStart: .word   $6000
-sheetEnd:   .word   $6000+LENGTH*64
+tileIndex:  .byte   0
+tileMax:    .byte   8
+sheetStart: .word   example_start
+sheetEnd:   .word   example_end
 
 ; Temporary
 shiftedBit: .byte   0
@@ -934,7 +1002,7 @@ fill_color_odd:
 ; and align
 
 .align  LENGTH
-
+example_start:
 water:
     .byte   $F5,$AF,$D5,$AA,$DD,$BA,$D5,$AA
     .byte   $D7,$EA,$D5,$AA,$D5,$AA,$D7,$EA
@@ -964,4 +1032,56 @@ bricks:
     .byte   $FF,$FF,$FF,$FF,$AB,$D5,$EA,$D5
     .byte   $AB,$D5,$EA,$D5,$AB,$D5,$EA,$D5
     .byte   $AB,$D5,$EA,$D5,$FF,$FF,$FF,$FF
+
+tile3:   
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+
+tile4:   
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+
+tile5:   
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+
+tile6:   
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+
+tile7:   
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+
+example_end:
 
