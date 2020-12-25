@@ -14,7 +14,12 @@ HEIGHT_BYTES    =   16
 WIDTH           =   WIDTH_BYTES*7
 HEIGHT          =   HEIGHT_BYTES
 LENGTH          =   WIDTH_BYTES * HEIGHT_BYTES
-PREVIEW_ADRS    =   HGRPAGE1+WIDTH+2
+PREVIEW_ADRS0   =   HGRPAGE1+WIDTH+2
+PREVIEW_ADRS1   =   HGRPAGE1+$80*4+WIDTH+2
+PREVIEW_ADRS2   =   HGRPAGE1+$80*4+WIDTH+2+WIDTH_BYTES
+PREVIEW_ADRS3   =   HGRPAGE1+$80*6+WIDTH+2
+PREVIEW_ADRS4   =   HGRPAGE1+$80*6+WIDTH+2+WIDTH_BYTES
+
 ;------------------------------------------------
 ; Zero page usage
 ;------------------------------------------------
@@ -651,18 +656,48 @@ xloop:
 
 .endproc
 
+
 ;-----------------------------------------------------------------------------
 ; drawPreview
 ;-----------------------------------------------------------------------------
-
 .proc drawPreview
-
     ; set screenPtr to fixed location
-    lda     #<PREVIEW_ADRS
+    lda     #<PREVIEW_ADRS0
     sta     screenPtr0
-    lda     #>PREVIEW_ADRS
+    lda     #>PREVIEW_ADRS0
     sta     screenPtr1
+    jsr     drawShape
 
+    lda     #<PREVIEW_ADRS1
+    sta     screenPtr0
+    lda     #>PREVIEW_ADRS1
+    sta     screenPtr1
+    jsr     drawShape
+    lda     #<PREVIEW_ADRS2
+    sta     screenPtr0
+    lda     #>PREVIEW_ADRS2
+    sta     screenPtr1
+    jsr     drawShape
+    lda     #<PREVIEW_ADRS3
+    sta     screenPtr0
+    lda     #>PREVIEW_ADRS3
+    sta     screenPtr1
+    jsr     drawShape
+    lda     #<PREVIEW_ADRS4
+    sta     screenPtr0
+    lda     #>PREVIEW_ADRS4
+    sta     screenPtr1
+    jsr     drawShape
+
+    rts
+.endproc
+
+;-----------------------------------------------------------------------------
+; drawShape
+;   Uses screenPtr for location and tilePtr for tile
+;-----------------------------------------------------------------------------
+
+.proc drawShape
     lda     tilePtr0    ; save a copy
     pha
 
@@ -899,21 +934,34 @@ fill_color_odd:
 ; and align
 
 .align  LENGTH
-exampleStart:   
-    .byte   $00,$00,$00,$00
-    .byte   $7f,$7f,$7f,$7f
-    .byte   $03,$55,$55,$60
-    .byte   $03,$55,$55,$60
-    .byte   $03,$55,$55,$60
-    .byte   $03,$2a,$2a,$60
-    .byte   $03,$2a,$2a,$60
-    .byte   $03,$2a,$2a,$60
-    .byte   $7f,$7f,$7f,$7f
-    .byte   $7f,$7f,$7f,$7f
-    .byte   $03,$d5,$d5,$60
-    .byte   $03,$d5,$d5,$60
-    .byte   $03,$d5,$d5,$60
-    .byte   $03,$aa,$aa,$60
-    .byte   $03,$aa,$aa,$60
-    .byte   $7f,$7f,$7f,$7f
-exampleEnd:
+
+water:
+    .byte   $F5,$AF,$D5,$AA,$DD,$BA,$D5,$AA
+    .byte   $D7,$EA,$D5,$AA,$D5,$AA,$D7,$EA
+    .byte   $D5,$AA,$DD,$BA,$D5,$AA,$F5,$AF
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA
+    .byte   $D5,$FA,$D7,$AA,$D5,$AE,$DD,$AA
+    .byte   $D5,$AB,$F5,$AA,$F5,$AA,$D5,$AB
+    .byte   $DD,$AA,$D5,$AE,$D7,$AA,$D5,$FA
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA
+
+grass:   
+    .byte   $2A,$55,$2A,$55,$2A,$55,$2A,$55
+    .byte   $2A,$55,$2A,$55,$2A,$55,$28,$55
+    .byte   $2A,$55,$2A,$55,$2A,$55,$2A,$55
+    .byte   $2A,$55,$2A,$55,$2A,$55,$2A,$55
+    .byte   $2A,$55,$2A,$55,$0A,$55,$2A,$55
+    .byte   $2A,$55,$2A,$55,$2A,$55,$2A,$55
+    .byte   $2A,$55,$2A,$55,$2A,$55,$2A,$54
+    .byte   $2A,$55,$2A,$55,$2A,$55,$2A,$55
+
+bricks:   
+    .byte   $EA,$D5,$AE,$D5,$EA,$D5,$AE,$D5
+    .byte   $EA,$D5,$AE,$D5,$EA,$D5,$AE,$D5
+    .byte   $FF,$FF,$FF,$FF,$AA,$DD,$AA,$F5
+    .byte   $AA,$DD,$AA,$F5,$AA,$DD,$AA,$F5
+    .byte   $AA,$DD,$AA,$F5,$AA,$DD,$AA,$F5
+    .byte   $FF,$FF,$FF,$FF,$AB,$D5,$EA,$D5
+    .byte   $AB,$D5,$EA,$D5,$AB,$D5,$EA,$D5
+    .byte   $AB,$D5,$EA,$D5,$FF,$FF,$FF,$FF
+
