@@ -9,6 +9,11 @@
 ; Constants
 ;------------------------------------------------
 
+DIR_LEFT        =   0
+DIR_RIGHT       =   1
+DIR_UP          =   2
+DIR_DOWN        =   3
+
 WIDTH_BYTES     =   4
 HEIGHT_BYTES    =   16
 WIDTH           =   WIDTH_BYTES*7
@@ -28,6 +33,9 @@ screenPtr0  :=  $52     ; Screen pointer
 screenPtr1  :=  $53
 tilePtr0    :=  $54     ; Tile pointer
 tilePtr1    :=  $55
+copyPtr0    :=  $56     ; For copying bytes
+copyPtr1    :=  $57
+
 
 ;-----------------------------------------------------------------------------
 ; Main
@@ -49,6 +57,12 @@ tilePtr1    :=  $55
     lda     sheetStart+1
     sta     tilePtr1
 
+    ; Init cursor
+    lda     #0
+    sta     curX
+    sta     curY
+
+    ; Draw screen
     jsr     refresh
 
 version:
@@ -343,6 +357,35 @@ next_continue2:
     jsr     refresh
     jmp     command_loop
 :
+
+    ;------------------
+    ; R = Rotate
+    ;------------------
+    cmp     #$80 | 'R'
+    bne     rotate_after
+    jsr     inline_print
+    .byte   "Rotate",13,"  Direction (or cancel):",0
+    jsr     get_input_direction
+    bmi     rotate_cancel
+
+    cmp     #DIR_UP
+    bne     :+
+    jsr     rotate_up
+    jmp     rotate_done
+:
+
+    cmp     #DIR_DOWN
+    bne     :+
+    jsr     rotate_down
+    jmp     rotate_done
+:
+
+rotate_done:
+    jsr     refresh
+rotate_cancel:
+    jmp     command_loop
+rotate_after:    
+
     ;------------------
     ; Unknown
     ;------------------
@@ -466,37 +509,36 @@ max_digit:  .byte   0
 
 ;-----------------------------------------------------------------------------
 ; get_input_direction
-;   Get input for a number 0..max+1, where A == max+1
-;   Display number or cancel and return result in A (-1 for cancel)
+;   Pick and diplay 1 of 4 directions or cancel
 ;-----------------------------------------------------------------------------
 .proc get_input_direction
     jsr     getInput
-    cmp     #KEY_RIGHT
-    bne     :+
-    jsr     inline_print
-    .byte   "Right",13,0
-    lda     #0
-    rts
-:
     cmp     #KEY_LEFT
     bne     :+
     jsr     inline_print
     .byte   "Left ",13,0
-    lda     #1
+    lda     #DIR_LEFT
+    rts
+:
+    cmp     #KEY_RIGHT
+    bne     :+
+    jsr     inline_print
+    .byte   "Right",13,0
+    lda     #DIR_RIGHT
     rts
 :
     cmp     #KEY_UP
     bne     :+
     jsr     inline_print
     .byte   "Up   ",13,0
-    lda     #2
+    lda     #DIR_UP
     rts
 :
     cmp     #KEY_DOWN
     bne     :+
     jsr     inline_print
     .byte   "Down ",13,0
-    lda     #3
+    lda     #DIR_DOWN
     rts
 :
     jsr     inline_print
@@ -507,19 +549,12 @@ max_digit:  .byte   0
 
 ;-----------------------------------------------------------------------------
 ; refresh
-;   Redraw screen and set cursor
+;   Redraw screen
 ;-----------------------------------------------------------------------------
 .proc refresh
-
     ; Set up screen
     jsr     drawTile
     jsr     drawPreview
-
-    ; Init cursor
-    lda     #0
-    sta     curX
-    sta     curY
-
     rts
 .endproc
 
@@ -540,6 +575,8 @@ cursor_loop:
     jsr     getColor
     jsr     drawPixel
 
+    ; FIXME - instead of using wait, use a loop that is 
+    ; interrupted if a key is pressed
     ; Wait (on)
     lda     #$FF
     jsr     WAIT
@@ -736,10 +773,14 @@ exit:
 
 ;-----------------------------------------------------------------------------
 ; drawTile
-;   Warning: clobbers curX, curY
 ;-----------------------------------------------------------------------------
 
 .proc drawTile
+    ; save curX/Y
+    lda     curX
+    pha
+    lda     curY
+    pha
 
     ; init to zero
     lda     #0
@@ -760,6 +801,12 @@ xloop:
     lda     curY
     cmp     #HEIGHT
     bne     yloop
+
+    ; restore curX/Y
+    pla
+    sta     curY
+    pla
+    sta     curX
     rts
 
 .endproc
@@ -868,7 +915,6 @@ shift_loop:
     asl
     dex
     bne     shift_loop
-    sta     shiftedBit
     rts
 continue:
     lda     #1
@@ -945,6 +991,92 @@ continue:
 .endproc
 
 ;-----------------------------------------------------------------------------
+; rotate_up
+;-----------------------------------------------------------------------------
+.proc rotate_up
+    ; copyPtr = tilePtr + WIDTH_BYTES
+    lda     tilePtr1
+    sta     copyPtr1
+    lda     tilePtr0
+    clc
+    adc     #WIDTH_BYTES
+    sta     copyPtr0
+    ldy     #0
+column_loop:
+    ; save first byte in temp    
+    lda     (tilePtr0),y
+    sta     savedByte
+    ldx     #HEIGHT_BYTES-1
+    jmp     first_iteration
+copy_loop:
+    tya
+    clc
+    adc     #WIDTH_BYTES
+    tay
+first_iteration:    
+    lda     (copyPtr0),y    ; source (dest+4)
+    sta     (tilePtr0),y    ; dest
+    dex
+    bne     copy_loop
+    lda     savedByte
+    sta     (copyPtr0),y
+    ; check if done (read last byte)
+    cpy     #LENGTH-WIDTH_BYTES-1
+    bne     :+
+    rts
+:
+    ; next column
+    tya
+    sec
+    sbc     #LENGTH-WIDTH_BYTES*2-1
+    tay
+    jmp     column_loop
+.endproc
+
+;-----------------------------------------------------------------------------
+; rotate_down
+;-----------------------------------------------------------------------------
+.proc rotate_down
+    ; copyPtr = tilePtr + WIDTH_BYTES
+    lda     tilePtr1
+    sta     copyPtr1
+    lda     tilePtr0
+    clc
+    adc     #WIDTH_BYTES
+    sta     copyPtr0
+    ldy     #LENGTH-WIDTH_BYTES-1
+column_loop:
+    ; save first byte in temp    
+    lda     (copyPtr0),y
+    sta     savedByte
+    ldx     #HEIGHT_BYTES-1
+    jmp     first_iteration
+copy_loop:
+    tya
+    sec
+    sbc     #WIDTH_BYTES
+    tay
+first_iteration:    
+    lda     (tilePtr0),y    ; source (dest-4)
+    sta     (copyPtr0),y    ; dest
+    dex
+    bne     copy_loop
+    lda     savedByte
+    sta     (tilePtr0),y
+    ; check if done (read last byte)
+    cpy     #0
+    bne     :+
+    rts
+:
+    ; next column
+    tya
+    clc
+    adc     #LENGTH-WIDTH_BYTES*2-1
+    tay
+    jmp     column_loop
+.endproc
+
+;-----------------------------------------------------------------------------
 ; Global Variables
 ;-----------------------------------------------------------------------------
 
@@ -957,6 +1089,7 @@ sheetStart: .word   example_start
 sheetEnd:   .word   example_end
 
 ; Temporary
+savedByte:
 shiftedBit: .byte   0
 
 
