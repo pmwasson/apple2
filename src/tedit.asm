@@ -254,7 +254,7 @@ toggle_text_off:
     ;------------------
     ; D = Dump
     ;------------------
-    cmp     #$80 + 'D' 
+    cmp     #$80 + '!' 
     bne     :+
     bit     TXTSET
     jsr     inline_print
@@ -268,6 +268,10 @@ toggle_text_off:
 
     lda     #0
     sta     dump_count
+    jmp     dump_loop
+dump_comma:
+    lda     #$80 + ','
+    jsr     COUT
 dump_loop:
     lda     #$80 + '$'
     jsr     COUT
@@ -278,11 +282,9 @@ dump_loop:
     lda     dump_count
     cmp     #LENGTH
     beq     dump_finish
-    lda     #$80 + ','
-    jsr     COUT
     lda     dump_count
     and     #$7
-    bne     dump_loop
+    bne     dump_comma
     jsr     inline_print
     .byte   13,"      ",0
     jmp     dump_loop
@@ -379,12 +381,59 @@ next_continue2:
     jsr     rotate_down
     jmp     rotate_done
 :
+    cmp     #DIR_LEFT
+    bne     :+
+    jsr     rotate_left
+    jmp     rotate_done
+:
+    ; must be right
+    jsr     rotate_right
 
 rotate_done:
     jsr     refresh
+
 rotate_cancel:
     jmp     command_loop
+
 rotate_after:    
+
+    ;------------------
+    ; X = flip bits
+    ;------------------
+    cmp     #$80 + 'X'
+    bne     :+
+    jsr     inline_print
+    .byte   "Flip pixel bits",13,0
+    ldy     #0
+flip_bits_loop:
+    lda     (tilePtr0),y
+    eor     #$7f
+    sta     (tilePtr0),y
+    iny
+    cpy     #LENGTH
+    bne     flip_bits_loop
+    jsr     refresh
+    jmp     command_loop
+:
+
+    ;------------------
+    ; Z = flip color
+    ;------------------
+    cmp     #$80 + 'Z'
+    bne     :+
+    jsr     inline_print
+    .byte   "Flip color bits",13,0
+    ldy     #0
+flip_color_loop:
+    lda     (tilePtr0),y
+    eor     #$80
+    sta     (tilePtr0),y
+    iny
+    cpy     #LENGTH
+    bne     flip_color_loop
+    jsr     refresh
+    jmp     command_loop
+:
 
     ;------------------
     ; Unknown
@@ -455,15 +504,16 @@ odd_fill:       .byte   0
     bit     TXTSET
     jsr     inline_print
     .byte   " Arrows: Move cursor",13
-    .byte   " Arrows & open-apple: Clear bit",13
-    .byte   " Arrows & close-apple: Set bit",13
+    .byte   " Arrows+open/close-apple: Clear/set bit",13
     .byte   " Space: Toggle bit",13
     .byte   " C: Toggle byte color",13
     .byte   " F: Fill tile color",13
-    .byte   " R: *Rotate bits",13
+    .byte   " R: Rotate bits in a direction",13
     .byte   " I: *Insert row/col",13
-    .byte   " X: *Delete row/col",13
-    .byte   " D: Dump bytes",13
+    .byte   " D: *Delete row/col",13
+    .byte   " X: Flip all pixel bits",13
+    .byte   " Z: Flip all color bits",13
+    .byte   " !: Dump bytes",13
     .byte   " L: *Load tile set",13
     .byte   " S: *Save tile set",13
     .byte   " N: *New tile set",13
@@ -1077,6 +1127,117 @@ first_iteration:
 .endproc
 
 ;-----------------------------------------------------------------------------
+; rotate_right
+;-----------------------------------------------------------------------------
+.proc rotate_right
+    ldy     #0
+loop:
+    lda     #0
+    sta     prevSavedBit
+    ldx     #WIDTH_BYTES
+
+byte_loop:
+    ; save color bit
+    lda     (tilePtr0),y
+    and     #$80
+    sta     savedColor
+    ; save bit 6 in bit 0
+    lda     (tilePtr0),y
+    rol     ; 6 -> 7
+    rol     ; 7 -> C
+    rol     ; C -> 0
+    and     #$1             ; only bit 0
+    sta     savedBit
+    ; shift bits
+    lda     (tilePtr0),y
+    asl
+    and     #$7e
+    ora     savedColor      ; preserve color
+    ora     prevSavedBit    ; shift in previous bit
+    sta     (tilePtr0),y
+
+    lda     savedBit
+    sta     prevSavedBit
+
+    iny
+    dex
+    bne     byte_loop
+
+    ; set final bit
+    sty     savedColor      ; save Y for next row
+    tya
+    sec
+    sbc     #WIDTH_BYTES
+    tay
+    lda     (tilePtr0),y
+    ora     prevSavedBit
+    sta     (tilePtr0),y
+
+    ; next row
+    ldy     savedColor
+    cpy     #LENGTH
+    bne     loop
+
+    rts
+
+.endproc
+
+;-----------------------------------------------------------------------------
+; rotate_left
+;-----------------------------------------------------------------------------
+.proc rotate_left
+    ldy     #LENGTH-1
+loop:
+    lda     #0
+    sta     prevSavedBit
+    ldx     #WIDTH_BYTES
+
+byte_loop:
+    ; save color bit
+    lda     (tilePtr0),y
+    and     #$80
+    sta     savedColor
+    ; save bit 0 in bit 6
+    lda     (tilePtr0),y
+    ror     ; 0 -> C
+    ror     ; C -> 7
+    ror     ; 7 -> 6
+    and     #$40            ; only bit 6
+    sta     savedBit
+    ; shift bits
+    lda     (tilePtr0),y
+    lsr
+    and     #$3f
+    ora     savedColor      ; preserve color
+    ora     prevSavedBit    ; shift in previous bit
+    sta     (tilePtr0),y
+
+    lda     savedBit
+    sta     prevSavedBit
+
+    dey
+    dex
+    bne     byte_loop
+
+    ; set final bit
+    sty     savedColor      ; save Y for next row
+    tya
+    clc
+    adc     #WIDTH_BYTES
+    tay
+    lda     (tilePtr0),y
+    ora     prevSavedBit
+    sta     (tilePtr0),y
+
+    ; next row
+    ldy     savedColor
+    bpl     loop
+
+    rts
+
+.endproc
+
+;-----------------------------------------------------------------------------
 ; Global Variables
 ;-----------------------------------------------------------------------------
 
@@ -1089,9 +1250,15 @@ sheetStart: .word   example_start
 sheetEnd:   .word   example_end
 
 ; Temporary
-savedByte:
-shiftedBit: .byte   0
 
+savedByte:
+savedBit:
+shiftedBit:     
+temp0:          .byte   0
+savedColor:     
+temp1:          .byte   0
+prevSavedBit:   
+temp2:          .byte   0
 
 ;-----------------------------------------------------------------------------
 ; Data
@@ -1207,47 +1374,47 @@ bricks:
     .byte   $AB,$D5,$EA,$D5,$AB,$D5,$EA,$D5
     .byte   $AB,$D5,$EA,$D5,$FF,$FF,$FF,$FF
 
-tile3:   
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+frog1:
+    .byte   $80,$80,$80,$80,$20,$15,$28,$05   
+    .byte   $68,$5F,$7A,$17,$78,$7A,$5E,$1E   
+    .byte   $58,$68,$16,$1A,$78,$7A,$5E,$1E   
+    .byte   $68,$5F,$7A,$17,$28,$55,$2A,$15   
+    .byte   $20,$45,$22,$05,$20,$55,$2A,$05   
+    .byte   $20,$D4,$AA,$04,$20,$55,$2A,$05   
+    .byte   $80,$28,$15,$80,$80,$24,$25,$80   
+    .byte   $80,$50,$0A,$80,$80,$14,$28,$80   
 
-tile4:   
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+frog2: 
+    .byte   $00,$80,$80,$00,$20,$15,$28,$05   
+    .byte   $28,$55,$2A,$15,$28,$55,$2A,$15   
+    .byte   $28,$55,$2A,$15,$08,$45,$22,$11   
+    .byte   $28,$50,$0A,$14,$28,$55,$2A,$15   
+    .byte   $20,$45,$22,$05,$20,$55,$2A,$05   
+    .byte   $20,$01,$00,$05,$00,$55,$2A,$01   
+    .byte   $00,$28,$15,$00,$00,$24,$25,$00   
+    .byte   $00,$50,$0A,$00,$00,$14,$28,$00   
 
-tile5:   
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+bridge0:            
+    .byte   $80,$80,$80,$80,$8A,$D5,$AA,$D4   
+    .byte   $8A,$D5,$AA,$D4,$8A,$D5,$AA,$D4   
+    .byte   $80,$80,$80,$80,$D5,$D2,$D4,$AA   
+    .byte   $D5,$D2,$D4,$AA,$D5,$D2,$D4,$AA   
+    .byte   $D5,$D2,$D4,$AA,$D5,$D2,$D4,$AA   
+    .byte   $D5,$D2,$D4,$AA,$D5,$D6,$D6,$AA   
+    .byte   $D5,$FA,$D5,$AA,$D5,$AA,$D5,$AA   
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA   
 
-tile6:   
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+bridge1:
+    .byte   $80,$80,$80,$80,$8A,$D5,$AA,$D4   
+    .byte   $8A,$D5,$AA,$D4,$8A,$D5,$AA,$D4   
+    .byte   $80,$80,$80,$80,$D5,$D2,$D4,$AA   
+    .byte   $D5,$D2,$D4,$AA,$D5,$D2,$D4,$AA   
+    .byte   $D5,$D2,$D4,$AA,$D5,$D2,$D4,$AA   
+    .byte   $D5,$D6,$D6,$AA,$D5,$FA,$D5,$AA   
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA   
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA   
 
-tile7:   
+blank_tile:   
     .byte   $00,$00,$00,$00,$00,$00,$00,$00
     .byte   $00,$00,$00,$00,$00,$00,$00,$00
     .byte   $00,$00,$00,$00,$00,$00,$00,$00
