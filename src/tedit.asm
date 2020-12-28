@@ -3,7 +3,7 @@
 ;-----------------------------------------------------------------------------
 ; tedit - Tile editor
 
-.include "defines.asm"
+; .include "defines.asm"
 
 ;------------------------------------------------
 ; Constants
@@ -36,15 +36,14 @@ tilePtr1    :=  $55
 copyPtr0    :=  $56     ; For copying bytes
 copyPtr1    :=  $57
 
+; .segment "CODE"
+; .org    $4000
 
 ;-----------------------------------------------------------------------------
-; Main
+; Tile Edit
 ;-----------------------------------------------------------------------------
 
-.segment "CODE"
-.org    $4000
-
-.proc main
+.proc tedit
     jsr     HGR         ; hi-res mixed mode
     jsr     HOME        ; clear screen
     lda     #23         ; put cursor on last line
@@ -906,19 +905,18 @@ xloop:
     lda     tilePtr0    ; save a copy
     pha
 
-    ldx     #HEIGHT_BYTES
+    ldx     #HEIGHT_BYTES-1
 drawLoopV:
-    ldy     #0
+    ldy     #WIDTH_BYTES-1
 drawLoopH:
     lda     (tilePtr0),y
     sta     (screenPtr0),y
-    iny
-    cpy     #WIDTH_BYTES
-    bne     drawLoopH
+    dey
+    bpl     drawLoopH
 
-    clc
+    sec
     lda     tilePtr0
-    adc     #WIDTH_BYTES
+    adc     #WIDTH_BYTES-1
     sta     tilePtr0
     ; assumes spritePtr aligned such that there are no page crossing
 
@@ -941,7 +939,7 @@ drawLoopH:
 
 continue:
     dex
-    bne     drawLoopV
+    bpl     drawLoopV
 
     ; restore tilePtr
     pla
@@ -951,6 +949,34 @@ continue:
 
 .endproc
 
+; Unrolled version
+.proc drawShape_7x8
+    ldy     #0
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #1
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #2
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #3
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #4
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #5
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #6
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #7
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    rts
+.endproc
 
 ;-----------------------------------------------------------------------------
 ; bitMask
@@ -1336,13 +1362,30 @@ fill_color_odd:
     .byte   $AA     ; 6 Blue    - flip on odd bytes
     .byte   $FF     ; 7 White
 
-; add utilies
-.include "inline_print.asm"
+
 
 ; Put example tile last (in case user extends)
 ; and align
 
 .align  LENGTH
+
+; 7x8 boarder shapes
+
+boarder_upper_left:
+    .byte   $00,$00,$00,$78,$FC,$3C,$1C,$1C
+boarder_horizontal:
+    .byte   $00,$00,$00,$7F,$FF,$00,$00,$00
+boarder_upper_right:
+    .byte   $00,$00,$00,$0F,$8F,$1E,$1C,$1C
+boarder_vertical:
+    .byte   $1C,$1C,$1C,$1C,$1C,$1C,$1C,$1C
+boarder_lower_left:
+    .byte   $1C,$1C,$3C,$FC,$78,$00,$00,$00
+boarder_lower_right:
+    .byte   $1C,$1C,$1E,$8F,$0F,$00,$00,$00
+
+.align  LENGTH
+
 example_start:
 water:
     .byte   $F5,$AF,$D5,$AA,$DD,$BA,$D5,$AA
