@@ -15,8 +15,8 @@ DIR_UP          =   2
 DIR_DOWN        =   3
 
 ; REMOVE!
-WIDTH_BYTES     =   4
-HEIGHT_BYTES    =   16
+WIDTH_BYTES     =   1
+HEIGHT_BYTES    =   8
 WIDTH           =   WIDTH_BYTES*7
 HEIGHT          =   HEIGHT_BYTES
 LENGTH          =   WIDTH_BYTES * HEIGHT_BYTES
@@ -958,7 +958,6 @@ vloop:
     lda     height
     cmp     charY
     bpl     vloop
-    rts
 
 .endproc
 
@@ -1365,18 +1364,18 @@ curX:           .byte   0
 curY:           .byte   0       
 curData:        .byte   0
 tileIndex:      .byte   0
-tileMax:        .byte   8
+tileMax:        .byte   64
 sheetStart:     .word   example_start
 sheetEnd:       .word   example_end
 
 ; when changes size, all of the following need to be updated
-width_bytes:    .byte   4       
-width_bytes_m1: .byte   3       ; width_byte - 1       
-width:          .byte   28      ; width_bytes * 7
-width_m1:       .byte   27      ; width - 1
-height:         .byte   16
-height_m1:      .byte   15      ; height - 1
-length:         .byte   64      ; width_bytes * height
+width_bytes:    .byte   1       
+width_bytes_m1: .byte   0       ; width_byte - 1       
+width:          .byte   7       ; width_bytes * 7
+width_m1:       .byte   6       ; width - 1
+height:         .byte   8
+height_m1:      .byte   7       ; height - 1
+length:         .byte   8       ; width_bytes * height
 
 ; Temporary
 
@@ -1425,6 +1424,137 @@ fill_color_odd:
 .align  256
 
 example_start:
+
+    ; @
+    .byte   $1E,$33,$33,$3B,$3B,$03,$3E,$00
+    ; A
+    .byte   $1E,$33,$33,$3F,$33,$33,$33,$00
+    ; B
+    .byte   $1F,$33,$33,$1F,$33,$33,$1F,$00
+    ; C
+    .byte   $1E,$33,$03,$03,$03,$33,$1E,$00
+    ; D
+    .byte   $1F,$33,$33,$33,$33,$33,$1F,$00
+    ; E
+    .byte   $3E,$06,$06,$1E,$06,$06,$3E,$00
+    ; F
+    .byte   $3E,$06,$06,$1E,$06,$06,$06,$00
+    ; G
+    .byte   $1E,$03,$03,$3B,$33,$33,$1E,$00
+    ; H
+    .byte   $33,$33,$33,$3F,$33,$33,$33,$00
+    ; I
+    .byte   $1E,$0C,$0C,$0C,$0C,$0C,$1E,$00
+    ; J
+    .byte   $30,$30,$30,$30,$30,$36,$1C,$00
+    ; K
+    .byte   $33,$3B,$1F,$0F,$1B,$33,$33,$00
+    ; L
+    .byte   $06,$06,$06,$06,$06,$06,$3E,$00
+    ; M
+    .byte   $33,$3F,$3F,$33,$33,$33,$33,$00
+    ; N
+    .byte   $33,$37,$37,$3F,$3B,$3B,$33,$00
+    ; O
+    .byte   $1E,$33,$33,$33,$33,$33,$1E,$00
+    ; P
+    .byte   $1F,$33,$33,$1F,$03,$03,$03,$00
+    ; Q
+    .byte   $1E,$33,$33,$33,$33,$1B,$3E,$00
+    ; R
+    .byte   $1F,$33,$33,$1F,$33,$33,$33,$00
+    ; S
+    .byte   $3C,$06,$06,$1C,$30,$30,$1E,$00
+    ; T
+    .byte   $3F,$0C,$0C,$0C,$0C,$0C,$0C,$00
+    ; U
+    .byte   $33,$33,$33,$33,$33,$33,$1E,$00
+    ; V
+    .byte   $33,$33,$33,$33,$33,$1E,$0C,$00
+    ; W
+    .byte   $33,$33,$33,$33,$3F,$3F,$33,$00
+    ; X
+    .byte   $33,$33,$1E,$0C,$1E,$33,$33,$00
+    ; Y
+    .byte   $33,$33,$33,$1E,$0C,$0C,$0C,$00
+    ; Z
+    .byte   $3E,$98,$18,$8C,$0C,$86,$3E,$00
+    ; [
+    .byte   $1E,$06,$06,$06,$06,$06,$1E,$00
+    ; \
+    .byte   $06,$86,$0C,$8C,$18,$98,$00,$00
+    ; ]
+    .byte   $1E,$18,$18,$18,$18,$18,$1E,$00
+    ; ^
+    .byte   $00,$0C,$1E,$33,$00,$00,$00,$00
+    ; _
+    .byte   $00,$00,$00,$00,$00,$00,$00,$7F
+    ; space
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    ; !
+    .byte   $0C,$0C,$0C,$0C,$0C,$00,$0C,$00
+    ; "
+    .byte   $B3,$33,$00,$00,$00,$00,$00,$00
+    ; #
+    .byte   $00,$36,$7F,$36,$36,$7F,$36,$00
+    ; $
+    .byte   $0C,$1E,$03,$1E,$30,$1E,$0C,$00
+    ; %
+    .byte   $03,$33,$18,$0C,$06,$33,$30,$00
+    ; &
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    ; '
+    .byte   $8C,$0C,$00,$00,$00,$00,$00,$00
+    ; (
+    .byte   $98,$8C,$0C,$0C,$0C,$8C,$98,$00
+    ; )
+    .byte   $0C,$18,$98,$98,$98,$18,$0C,$00
+    ; *
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    ; +
+    .byte   $00,$0C,$0C,$3F,$0C,$0C,$00,$00
+    ; ,
+    .byte   $00,$00,$00,$00,$8C,$8C,$0C,$00
+    ; -
+    .byte   $00,$00,$00,$1E,$00,$00,$00,$00
+    ; .
+    .byte   $00,$00,$00,$00,$00,$0C,$0C,$00
+    ; /
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    ; 0
+    .byte   $1E,$33,$33,$33,$33,$33,$1E,$00
+    ; 1
+    .byte   $0C,$0E,$0C,$0C,$0C,$0C,$1E,$00
+    ; 2
+    .byte   $1E,$30,$30,$1C,$06,$06,$3E,$00
+    ; 3
+    .byte   $1E,$30,$30,$1C,$30,$30,$1E,$00
+    ; 4
+    .byte   $33,$33,$33,$3F,$30,$30,$30,$00
+    ; 5
+    .byte   $3E,$06,$06,$1E,$30,$30,$1E,$00
+    ; 6
+    .byte   $1E,$33,$03,$1F,$33,$33,$1E,$00
+    ; 7
+    .byte   $3F,$98,$18,$8C,$0C,$86,$06,$00
+    ; 8
+    .byte   $1E,$33,$33,$1E,$33,$33,$1E,$00
+    ; 9
+    .byte   $1E,$33,$33,$3E,$30,$33,$1E,$00
+    ; :
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    ; ;
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    ; <
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    ; =
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    ; >
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    ; ?
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+example_end:
+
 water:
     .byte   $F5,$AF,$D5,$AA,$DD,$BA,$D5,$AA
     .byte   $D7,$EA,$D5,$AA,$D5,$AA,$D7,$EA
@@ -1505,6 +1635,6 @@ trees:
     .byte   $28,$05,$2A,$01,$02,$D0,$80,$44   
     .byte   $0A,$D0,$80,$55,$2A,$55,$2A,$55   
 
-example_end:
+; example_end:
 
 .endproc ; tedit
