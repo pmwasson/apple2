@@ -45,11 +45,17 @@ copyPtr1    :=  $63
 .proc tedit
 
 .proc tedit_main
-    jsr     HGR         ; hi-res mixed mode
     jsr     HOME        ; clear screen
     lda     #23         ; put cursor on last line
     sta     CV
     jsr     VTAB
+
+    ; display a greeting
+    jsr     inline_print
+    .byte   "Tile editor v0.1 - ? for help",13,0
+
+reset:
+    jsr     HGR         ; hi-res mixed mode
 
     ; Draw background
     jsr     drawBackground
@@ -68,10 +74,6 @@ copyPtr1    :=  $63
     ; Draw screen
     jsr     refresh
 
-version:
-    ; display a greeting
-    jsr     inline_print
-    .byte   "Tile editor v0.1 - ? for help",13,0
 
 command_loop:
 
@@ -238,7 +240,7 @@ fill_loop:
     lda     odd_fill
     sta     (tilePtr0),y
     iny
-    cpy     #LENGTH
+    cpy     length
     bne     fill_loop
     jsr     CR
     jsr     refresh
@@ -287,7 +289,7 @@ dump_loop:
     jsr     PRBYTE
     inc     dump_count
     lda     dump_count
-    cmp     #LENGTH
+    cmp     length
     beq     dump_finish
     lda     dump_count
     and     #$7
@@ -309,25 +311,15 @@ dump_finish:
     .byte   "Previous tile: ",0
 
     lda     tileIndex
-    bne     previous_continue1
-
-    ; point to last tile + 1
-    lda     tileMax
-    sta     tileIndex
-    lda     #<example_end
-    sta     tilePtr0
-    lda     #>example_end
-    sta     tilePtr1
-
-previous_continue1:
+    beq     previous_continue   ; stay at 0
     dec     tileIndex
     sec
     lda     tilePtr0
-    sbc     #LENGTH
+    sbc     length
     sta     tilePtr0
-    bcs     previous_continue2
+    bcs     previous_continue
     dec     tilePtr1
-previous_continue2:
+previous_continue:
     lda     tileIndex
     jsr     PRBYTE
     jsr     CR
@@ -342,24 +334,20 @@ previous_continue2:
     jsr     inline_print
     .byte   "Next tile: ",0
 
+    lda     tileIndex
+    clc
+    adc     #1
+    cmp     tileMax
+    beq     next_continue   ; if at max, stay there
+
     inc     tileIndex
     clc
     lda     tilePtr0
-    adc     #LENGTH
+    adc     length
     sta     tilePtr0
-    bcc     next_continue1
+    bcc     next_continue
     inc     tilePtr1
-next_continue1:
-    lda     tileIndex
-    cmp     tileMax
-    bne     next_continue2
-    lda     #0
-    sta     tileIndex
-    lda     #<example_start
-    sta     tilePtr0
-    lda     #>example_start
-    sta     tilePtr1
-next_continue2:
+next_continue:
     lda     tileIndex
     jsr     PRBYTE
     jsr     CR
@@ -417,7 +405,7 @@ flip_bits_loop:
     eor     #$7f
     sta     (tilePtr0),y
     iny
-    cpy     #LENGTH
+    cpy     length
     bne     flip_bits_loop
     jsr     refresh
     jmp     command_loop
@@ -436,12 +424,47 @@ flip_color_loop:
     eor     #$80
     sta     (tilePtr0),y
     iny
-    cpy     #LENGTH
+    cpy     length
     bne     flip_color_loop
     jsr     refresh
     jmp     command_loop
 :
 
+    ;------------------
+    ; N = new size
+    ;------------------
+    cmp     #$80 + 'N'
+    bne     :+
+    jsr     inline_print
+    .byte   "New size",13," (0=7x8,1=14x8,2=14x16,3=28x16):",0
+    lda     #$4
+    jsr     get_input_number
+    bpl     new_continue
+    jmp     command_loop
+new_continue:
+    tax
+    lda     sizeHeight,x
+    sta     height
+    sta     height_m1
+    dec     height_m1
+    lda     sizeHeightBytes,x
+    sta     height_bytes
+    lda     sizeWidth,x
+    sta     width
+    sta     width_m1
+    dec     width_m1
+    lda     sizeWidthBytes,x
+    sta     width_bytes
+    sta     width_bytes_m1
+    dec     width_bytes_m1
+    lda     sizeLength,x
+    sta     length    
+    ; Reset
+    lda     #0
+    sta     tileIndex
+    jsr     CR
+    jmp     reset
+:
     ;------------------
     ; Unknown
     ;------------------
@@ -498,9 +521,15 @@ display_byte:
 
 ; Local variables
 
-dump_count:     ; share with fill color
-even_fill:      .byte   0
-odd_fill:       .byte   0
+dump_count:         ; share with fill color
+even_fill:          .byte   0
+odd_fill:           .byte   0
+
+sizeHeight:         .byte   8,8,16,16
+sizeHeightBytes:    .byte   1,1,2,2
+sizeWidth:          .byte   7,14,14,28
+sizeWidthBytes:     .byte   1,2,2,4
+sizeLength:         .byte   8,16,32,64
 
 .endproc ; tedit_main  
 
@@ -523,7 +552,7 @@ odd_fill:       .byte   0
     .byte   " !: Dump bytes",13
     .byte   " L: *Load tile set",13
     .byte   " S: *Save tile set",13
-    .byte   " N: *New tile set",13
+    .byte   " N: New size",13
     .byte   " -: Go to previous tile",13
     .byte   " =: Go to next tile",13
     .byte   " ?: HELP",13
@@ -672,16 +701,11 @@ exit:
 
 ;-----------------------------------------------------------------------------
 ; setScreenPtr
-;   Based on curX, curY
-;   Note, offset by 1 for boarder
+;   Based on X (vertical) and A (horizontal)
 ;-----------------------------------------------------------------------------
 .proc setScreenPtr
     ; calculate screen pointer
     clc
-    ldx     curY
-    inx                     ; y+1
-    lda     curX            ; curX
-    sec                     ; x+1
     adc     lineOffset,x    ; lineOffset(curY)
     sta     screenPtr0    
     lda     linePage,x
@@ -697,6 +721,11 @@ exit:
 ;-----------------------------------------------------------------------------
 .proc drawPixel
     sta     color
+    ldx     curY
+    inx             ; offset by 1 for boarder
+    lda     curX
+    clc
+    adc     #1
     jsr     setScreenPtr
     ldx     #8
     ldy     #0
@@ -882,82 +911,32 @@ xloop:
 ;-----------------------------------------------------------------------------
 .proc drawBackground
 
-    ; upper-left
+    ; edit window
     lda     #0
-    sta     charX
-    lda     #0
-    sta     charY
-    lda     #boarder_upper_left
-    jsr     drawChar
-
-    ; upper-right
-    ;---------------------------
+    sta     charTop
+    sta     charLeft
     lda     width
-    sta     charX
-    inc     charX   ; width+1
-    ;lda     #0
-    ;sta     charY
-    lda     #boarder_upper_right
-    jsr     drawChar
-
-    ; lower-right
-    ;---------------------------
+    sta     charRight
+    inc     charRight
     lda     height
-    sta     charY
-    inc     charY   ; height+1
-    lda     #boarder_lower_right
-    jsr     drawChar
+    sta     charBottom
+    inc     charBottom
+    jsr     drawBox
 
-    ; lower-left
-    ;---------------------------
-    lda     #0
-    sta     charX
-    lda     #boarder_lower_left
-    jsr     drawChar
+    ; live window
+    lda     charRight
+    clc
+    adc     #2
+    sta     charLeft
+    sec
+    adc     width_bytes
+    sta     charRight
+    lda     height_bytes
+    sta     charBottom
+    inc     charBottom
+    jsr     drawBox
 
-    ; draw horizontal
-    ;---------------------------
-    lda     #1
-    sta     charX
-
-hloop:
-    lda     #0
-    sta     charY
-    lda     #boarder_horizontal
-    jsr     drawChar
-
-    lda     height
-    sta     charY
-    inc     charY   ; height+1
-    lda     #boarder_horizontal
-    jsr     drawChar
-
-    inc     charX
-    lda     width
-    cmp     charX
-    bpl     hloop
- 
-    ; draw vertical
-    ;---------------------------
-    lda     #1
-    sta     charY
-
-vloop:
-    lda     #0
-    sta     charX
-    lda     #boarder_vertical
-    jsr     drawChar
-
-    lda     width
-    sta     charX
-    inc     charX   ; width+1
-    lda     #boarder_vertical
-    jsr     drawChar
-
-    inc     charY
-    lda     height
-    cmp     charY
-    bpl     vloop
+    rts
 
 .endproc
 
@@ -966,32 +945,34 @@ vloop:
 ;-----------------------------------------------------------------------------
 .proc drawPreview
     ; set screenPtr to fixed location
-    lda     #<PREVIEW_ADRS0
-    sta     screenPtr0
-    lda     #>PREVIEW_ADRS0
-    sta     screenPtr1
+    ldx     #1
+    lda     width
+    clc
+    adc     #4
+    jsr     setScreenPtr
     jsr     drawShape
 
-    lda     #<PREVIEW_ADRS1
-    sta     screenPtr0
-    lda     #>PREVIEW_ADRS1
-    sta     screenPtr1
-    jsr     drawShape
-    lda     #<PREVIEW_ADRS2
-    sta     screenPtr0
-    lda     #>PREVIEW_ADRS2
-    sta     screenPtr1
-    jsr     drawShape
-    lda     #<PREVIEW_ADRS3
-    sta     screenPtr0
-    lda     #>PREVIEW_ADRS3
-    sta     screenPtr1
-    jsr     drawShape
-    lda     #<PREVIEW_ADRS4
-    sta     screenPtr0
-    lda     #>PREVIEW_ADRS4
-    sta     screenPtr1
-    jsr     drawShape
+
+;    lda     #<PREVIEW_ADRS1
+;    sta     screenPtr0
+;    lda     #>PREVIEW_ADRS1
+;    sta     screenPtr1
+;    jsr     drawShape
+;    lda     #<PREVIEW_ADRS2
+;    sta     screenPtr0
+;    lda     #>PREVIEW_ADRS2
+;    sta     screenPtr1
+;    jsr     drawShape
+;    lda     #<PREVIEW_ADRS3
+;    sta     screenPtr0
+;    lda     #>PREVIEW_ADRS3
+;    sta     screenPtr1
+;    jsr     drawShape
+;    lda     #<PREVIEW_ADRS4
+;    sta     screenPtr0
+;    lda     #>PREVIEW_ADRS4
+;    sta     screenPtr1
+;    jsr     drawShape
 
     rts
 .endproc
@@ -1294,7 +1275,7 @@ byte_loop:
 
     ; next row
     ldy     savedColor
-    cpy     #LENGTH
+    cpy     length
     bne     loop
 
     rts
@@ -1305,7 +1286,8 @@ byte_loop:
 ; rotate_left
 ;-----------------------------------------------------------------------------
 .proc rotate_left
-    ldy     #LENGTH-1
+    ldy     length
+    dey
 loop:
     lda     #0
     sta     prevSavedBit
@@ -1366,14 +1348,14 @@ curData:        .byte   0
 tileIndex:      .byte   0
 tileMax:        .byte   64
 sheetStart:     .word   example_start
-sheetEnd:       .word   example_end
 
 ; when changes size, all of the following need to be updated
 width_bytes:    .byte   1       
 width_bytes_m1: .byte   0       ; width_byte - 1       
 width:          .byte   7       ; width_bytes * 7
 width_m1:       .byte   6       ; width - 1
-height:         .byte   8
+height_bytes:   .byte   1
+height:         .byte   8       ; height_bytes * 8
 height_m1:      .byte   7       ; height - 1
 length:         .byte   8       ; width_bytes * height
 

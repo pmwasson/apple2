@@ -7,6 +7,8 @@ screenPtr0  :=  $52     ; Screen pointer
 screenPtr1  :=  $53
 fontPtr0    :=  $54
 fontPtr1    :=  $55
+stackPtr0   :=  $56
+stackPtr1   :=  $57
 
 ;-----------------------------------------------------------------------------
 ; drawChar
@@ -78,12 +80,136 @@ temp0:  .byte   0
 
 .endproc
 
+.proc drawString
+    ; Pop return address to find string
+    pla
+    sta     stackPtr0
+    pla
+    sta     stackPtr1
+    ldy     #0
+
+    ; Print characters until 0 (end-of-string)
+printLoop:
+    iny
+    bne     :+              ; Allow strings > 255
+    inc     stackPtr1
+:
+    tya
+    pha
+    lda     (stackPtr0),y
+    beq     printExit
+    and     #$3f            ; convert ascii
+    jsr     drawChar
+    inc     charX
+    pla
+    tay
+    jmp     printLoop
+
+printExit:
+    pla                 ; clean up stack
+    ; calculate return address after print string
+    clc
+    tya
+    adc     stackPtr0  ; add low-byte first
+    tax                 ; save in X
+    lda     stackPtr1  ; carry to high-byte
+    adc     #0          
+    pha                 ; push return high-byte
+    txa
+    pha                 ; push return low-byte
+    rts                 ; return
+
+.endproc ; print
+
+.proc   drawBox
+    ; upper-left
+    ;---------------------------
+    lda     charLeft
+    sta     charX
+    lda     charTop
+    sta     charY
+    lda     #boarder_upper_left
+    jsr     drawChar
+
+    ; upper-right
+    ;---------------------------
+    lda     charRight
+    sta     charX
+    lda     #boarder_upper_right
+    jsr     drawChar
+
+    ; lower-right
+    ;---------------------------
+    lda     charBottom
+    sta     charY
+    lda     #boarder_lower_right
+    jsr     drawChar
+
+    ; lower-left
+    ;---------------------------
+    lda     charLeft
+    sta     charX
+    lda     #boarder_lower_left
+    jsr     drawChar
+
+    ; draw horizontal
+    ;---------------------------
+    lda     charLeft
+    sta     charX
+    inc     charX
+
+hloop:
+    lda     charTop
+    sta     charY
+    lda     #boarder_horizontal
+    jsr     drawChar
+
+    lda     charBottom
+    sta     charY
+    lda     #boarder_horizontal
+    jsr     drawChar
+
+    inc     charX
+    lda     charRight
+    cmp     charX
+    bne     hloop
+
+    ; draw vertical
+    ;---------------------------
+    lda     charTop
+    sta     charY
+    inc     charY
+
+vloop:
+    lda     charLeft
+    sta     charX
+    lda     #boarder_vertical
+    jsr     drawChar
+
+    lda     charRight
+    sta     charX
+    lda     #boarder_vertical
+    jsr     drawChar
+
+    inc     charY
+    lda     charBottom
+    cmp     charY
+    bne     vloop
+
+    rts
+
+.endproc
+
 ;-----------------------------------------------------------------------------
 ; globals
 ;-----------------------------------------------------------------------------
 
-charX:   .byte  0
-charY:   .byte  0
+charX:      .byte   0
+charY:      .byte   0
+charLeft:   .byte   0
+charTop:    .byte   0
+charRight:  .byte   0
+charBottom: .byte   0
 
 lineOffset:
     .byte   <$2000
