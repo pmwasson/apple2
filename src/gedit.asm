@@ -20,6 +20,7 @@
 ; add utilies
 
 .include "inline_print.asm"
+.include "font7x8.asm"
 
 ; Tile Edit
 ;-----------------------------------------------------------------------------

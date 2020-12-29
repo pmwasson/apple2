@@ -14,27 +14,21 @@ DIR_RIGHT       =   1
 DIR_UP          =   2
 DIR_DOWN        =   3
 
-WIDTH_BYTES     =   4
-HEIGHT_BYTES    =   16
-WIDTH           =   WIDTH_BYTES*7
-HEIGHT          =   HEIGHT_BYTES
-LENGTH          =   WIDTH_BYTES * HEIGHT_BYTES
-PREVIEW_ADRS0   =   HGRPAGE1+WIDTH+2
-PREVIEW_ADRS1   =   HGRPAGE1+$80*4+WIDTH+2
-PREVIEW_ADRS2   =   HGRPAGE1+$80*4+WIDTH+2+WIDTH_BYTES
-PREVIEW_ADRS3   =   HGRPAGE1+$80*6+WIDTH+2
-PREVIEW_ADRS4   =   HGRPAGE1+$80*6+WIDTH+2+WIDTH_BYTES
+; REMOVE!
+;PREVIEW_ADRS0   =   HGRPAGE1+$80*1+WIDTH+4
+;PREVIEW_ADRS1   =   HGRPAGE1+$28+$80*0         +WIDTH+2
+;PREVIEW_ADRS2   =   HGRPAGE1+$28+$80*0         +WIDTH+2+WIDTH_BYTES
+;PREVIEW_ADRS3   =   HGRPAGE1+$28+$80*(HEIGHT/8)+WIDTH+2
+;PREVIEW_ADRS4   =   HGRPAGE1+$28+$80*(HEIGHT/8)+WIDTH+2+WIDTH_BYTES
 
 ;------------------------------------------------
 ; Zero page usage
 ;------------------------------------------------
 
-screenPtr0  :=  $52     ; Screen pointer
-screenPtr1  :=  $53
-tilePtr0    :=  $54     ; Tile pointer
-tilePtr1    :=  $55
-copyPtr0    :=  $56     ; For copying bytes
-copyPtr1    :=  $57
+tilePtr0    :=  $60     ; Tile pointer
+tilePtr1    :=  $61
+copyPtr0    :=  $62     ; For copying bytes
+copyPtr1    :=  $63
 
 ; .segment "CODE"
 ; .org    $4000
@@ -44,11 +38,16 @@ copyPtr1    :=  $57
 ;-----------------------------------------------------------------------------
 
 .proc tedit
+
+.proc tedit_main
     jsr     HGR         ; hi-res mixed mode
     jsr     HOME        ; clear screen
     lda     #23         ; put cursor on last line
     sta     CV
     jsr     VTAB
+
+    ; Draw background
+    jsr     drawBackground
 
     ; Initialize tilePtr
     lda     sheetStart
@@ -91,7 +90,7 @@ skip_prompt:
     jsr     inline_print
     .byte   "Right ",0
     inc     curX
-    lda     #WIDTH
+    lda     width
     cmp     curX
     bne     right_good
     lda     #0
@@ -109,7 +108,7 @@ right_good:
     dec     curX
     lda     curX
     bpl     left_good
-    lda     #WIDTH-1
+    lda     width_m1
     sta     curX
 left_good:
     jmp     finish_move
@@ -218,11 +217,15 @@ continue_fill:
     jmp     command_loop
 continue_fill2:
     tax
+    ldy     #0
     lda     fill_color_even,x
     sta     even_fill
+    sta     odd_fill
+    lda     #1
+    cmp     width_bytes
+    beq     fill_loop           ; if 1 byte, no even/odd
     lda     fill_color_odd,x
     sta     odd_fill
-    ldy     #0
 fill_loop:
     lda     even_fill
     sta     (tilePtr0),y
@@ -494,7 +497,7 @@ dump_count:     ; share with fill color
 even_fill:      .byte   0
 odd_fill:       .byte   0
 
-.endproc ; main  
+.endproc ; tedit_main  
 
 ;-----------------------------------------------------------------------------
 ; print_help
@@ -665,13 +668,16 @@ exit:
 ;-----------------------------------------------------------------------------
 ; setScreenPtr
 ;   Based on curX, curY
+;   Note, offset by 1 for boarder
 ;-----------------------------------------------------------------------------
 .proc setScreenPtr
     ; calculate screen pointer
     clc
     ldx     curY
+    inx                     ; y+1
     lda     curX            ; curX
-    adc     lineOffset,x    ; + lineOffset(curY)
+    sec                     ; x+1
+    adc     lineOffset,x    ; lineOffset(curY)
     sta     screenPtr0    
     lda     linePage,x
     sta     screenPtr1
@@ -708,13 +714,19 @@ color:      .byte   0
 ;-----------------------------------------------------------------------------
 ; getByteOffset
 ;   Return byte offset in A based on curX, curY 
-;   WARNING: assumes width of 4, should generalize
 ;-----------------------------------------------------------------------------
 .proc getByteOffset
     lda     curY
-    asl
-    asl             ; y*4
     sta     tempY
+    lda     width_bytes
+    cmp     #1
+    beq     xoffset     ; if width=1, tempY=y
+    asl     tempY
+    cmp     #2 
+    beq     xoffset     ; if width=2, tempY=y*2
+    asl     tempY       ; else        tempY=y*4
+
+xoffset:
     ldx     #3      ; 3
     lda     curX
     cmp     #7*3
@@ -812,10 +824,10 @@ exit:
 .proc getColor
     jsr     getTileByte
     bmi     bitOne
-    lda     #$55
+    lda     #$2a
     jmp     exit
 bitOne:
-    lda     #$D5
+    lda     #$aa
 exit:
     rts
 .endproc
@@ -843,7 +855,7 @@ xloop:
 
     inc     curX
     lda     curX
-    cmp     #WIDTH
+    cmp     width
     bmi     xloop
 
     inc     curY
@@ -860,6 +872,90 @@ xloop:
 
 .endproc
 
+;-----------------------------------------------------------------------------
+; drawBackground
+;-----------------------------------------------------------------------------
+.proc drawBackground
+
+    ; upper-left
+    lda     #0
+    sta     charX
+    lda     #0
+    sta     charY
+    lda     #boarder_upper_left
+    jsr     drawChar
+
+    ; upper-right
+    ;---------------------------
+    lda     #WIDTH+1
+    sta     charX
+    ;lda     #0
+    ;sta     charY
+    lda     #boarder_upper_right
+    jsr     drawChar
+
+    ; lower-right
+    ;---------------------------
+    ;lda     #WIDTH+1
+    ;sta     charX
+    lda     #HEIGHT+1
+    sta     charY
+    lda     #boarder_lower_right
+    jsr     drawChar
+
+    ; lower-left
+    ;---------------------------
+    lda     #0
+    sta     charX
+    ;lda     #HEIGHT+1
+    ;sta     charY
+    lda     #boarder_lower_left
+    jsr     drawChar
+
+    ; draw horizontal
+    ;---------------------------
+    lda     #1
+    sta     charX
+
+hloop:
+    lda     #0
+    sta     charY
+    lda     #boarder_horizontal
+    jsr     drawChar
+
+    lda     #HEIGHT+1
+    sta     charY
+    lda     #boarder_horizontal
+    jsr     drawChar
+
+    inc     charX
+    lda     #WIDTH+1
+    cmp     charX
+    bne     hloop
+ 
+    ; draw vertical
+    ;---------------------------
+    lda     #1
+    sta     charY
+
+vloop:
+    lda     #0
+    sta     charX
+    lda     #boarder_vertical
+    jsr     drawChar
+
+    lda     #WIDTH+1
+    sta     charX
+    lda     #boarder_vertical
+    jsr     drawChar
+
+    inc     charY
+    lda     #HEIGHT+1
+    cmp     charY
+    bne     vloop
+    rts
+
+.endproc
 
 ;-----------------------------------------------------------------------------
 ; drawPreview
@@ -947,35 +1043,6 @@ continue:
 
     rts
 
-.endproc
-
-; Unrolled version
-.proc drawShape_7x8
-    ldy     #0
-    lda     (tilePtr0),y
-    sta     (screenPtr0),y
-    ldy     #1
-    lda     (tilePtr0),y
-    sta     (screenPtr0),y
-    ldy     #2
-    lda     (tilePtr0),y
-    sta     (screenPtr0),y
-    ldy     #3
-    lda     (tilePtr0),y
-    sta     (screenPtr0),y
-    ldy     #4
-    lda     (tilePtr0),y
-    sta     (screenPtr0),y
-    ldy     #5
-    lda     (tilePtr0),y
-    sta     (screenPtr0),y
-    ldy     #6
-    lda     (tilePtr0),y
-    sta     (screenPtr0),y
-    ldy     #7
-    lda     (tilePtr0),y
-    sta     (screenPtr0),y
-    rts
 .endproc
 
 ;-----------------------------------------------------------------------------
@@ -1267,13 +1334,19 @@ byte_loop:
 ; Global Variables
 ;-----------------------------------------------------------------------------
 
-curX:       .byte   0       
-curY:       .byte   0       
-curData:    .byte   0
-tileIndex:  .byte   0
-tileMax:    .byte   8
-sheetStart: .word   example_start
-sheetEnd:   .word   example_end
+curX:           .byte   0       
+curY:           .byte   0       
+curData:        .byte   0
+tileIndex:      .byte   0
+tileMax:        .byte   48
+sheetStart:     .word   example_start
+sheetEnd:       .word   example_end
+
+; when changes size, all of the following need to be updated
+width_bytes     .byte   4       
+width           .byte   28      ; width_bytes * 7
+height          .byte   16
+length          .byte   64      ; width_bytes * height
 
 ; Temporary
 
@@ -1290,57 +1363,7 @@ temp2:          .byte   0
 ; Data
 ;-----------------------------------------------------------------------------
 
-linePage:
-    .byte   >$2000
-    .byte   >$2080
-    .byte   >$2100
-    .byte   >$2180
-    .byte   >$2200
-    .byte   >$2280
-    .byte   >$2300
-    .byte   >$2380
-    .byte   >$2028
-    .byte   >$20A8
-    .byte   >$2128
-    .byte   >$21A8
-    .byte   >$2228
-    .byte   >$22A8
-    .byte   >$2328
-    .byte   >$23A8
-    .byte   >$2050
-    .byte   >$20D0
-    .byte   >$2150
-    .byte   >$21D0
-    .byte   >$2250
-    .byte   >$22D0
-    .byte   >$2350
-    .byte   >$23D0
 
-lineOffset:
-    .byte   <$2000
-    .byte   <$2080
-    .byte   <$2100
-    .byte   <$2180
-    .byte   <$2200
-    .byte   <$2280
-    .byte   <$2300
-    .byte   <$2380
-    .byte   <$2028
-    .byte   <$20A8
-    .byte   <$2128
-    .byte   <$21A8
-    .byte   <$2228
-    .byte   <$22A8
-    .byte   <$2328
-    .byte   <$23A8
-    .byte   <$2050
-    .byte   <$20D0
-    .byte   <$2150
-    .byte   <$21D0
-    .byte   <$2250
-    .byte   <$22D0
-    .byte   <$2350
-    .byte   <$23D0
 
 fill_color_even:
     .byte   $00     ; 0 Black
@@ -1364,25 +1387,10 @@ fill_color_odd:
 
 
 
+
+
 ; Put example tile last (in case user extends)
 ; and align
-
-.align  LENGTH
-
-; 7x8 boarder shapes
-
-boarder_upper_left:
-    .byte   $00,$00,$00,$78,$FC,$3C,$1C,$1C
-boarder_horizontal:
-    .byte   $00,$00,$00,$7F,$FF,$00,$00,$00
-boarder_upper_right:
-    .byte   $00,$00,$00,$0F,$8F,$1E,$1C,$1C
-boarder_vertical:
-    .byte   $1C,$1C,$1C,$1C,$1C,$1C,$1C,$1C
-boarder_lower_left:
-    .byte   $1C,$1C,$3C,$FC,$78,$00,$00,$00
-boarder_lower_right:
-    .byte   $1C,$1C,$1E,$8F,$0F,$00,$00,$00
 
 .align  LENGTH
 
@@ -1469,3 +1477,4 @@ trees:
 
 example_end:
 
+.endproc ; tedit
