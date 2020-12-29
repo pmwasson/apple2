@@ -128,7 +128,7 @@ left_good:
     dec     curY
     lda     curY
     bpl     up_good
-    lda     #HEIGHT-1
+    lda     height_m1
     sta     curY
 up_good:
     jmp     finish_move
@@ -141,7 +141,7 @@ up_good:
     jsr     inline_print
     .byte   "Down  ",0
     inc     curY
-    lda     #HEIGHT
+    lda     height
     cmp     curY
     bne     down_good
     lda     #0
@@ -865,7 +865,7 @@ xloop:
 
     inc     curY
     lda     curY
-    cmp     #HEIGHT
+    cmp     height
     bne     yloop
 
     ; restore curX/Y
@@ -902,8 +902,9 @@ xloop:
 
     ; lower-right
     ;---------------------------
-    lda     #HEIGHT+1
+    lda     height
     sta     charY
+    inc     charY   ; height+1
     lda     #boarder_lower_right
     jsr     drawChar
 
@@ -925,8 +926,9 @@ hloop:
     lda     #boarder_horizontal
     jsr     drawChar
 
-    lda     #HEIGHT+1
+    lda     height
     sta     charY
+    inc     charY   ; height+1
     lda     #boarder_horizontal
     jsr     drawChar
 
@@ -953,9 +955,9 @@ vloop:
     jsr     drawChar
 
     inc     charY
-    lda     #HEIGHT+1
+    lda     height
     cmp     charY
-    bne     vloop
+    bpl     vloop
     rts
 
 .endproc
@@ -1004,7 +1006,7 @@ vloop:
     lda     tilePtr0    ; save a copy
     pha
 
-    ldx     #HEIGHT_BYTES-1
+    ldx     height_m1
 drawLoopV:
     ldy     width_bytes_m1
 drawLoopH:
@@ -1159,7 +1161,7 @@ column_loop:
     ; save first byte in temp    
     lda     (tilePtr0),y
     sta     savedByte
-    ldx     #HEIGHT_BYTES-1
+    ldx     height_m1
     jmp     first_iteration
 copy_loop:
     tya
@@ -1214,7 +1216,7 @@ column_loop:
     ; save first byte in temp    
     lda     (copyPtr0),y
     sta     savedByte
-    ldx     #HEIGHT_BYTES-1
+    ldx     height_m1
     jmp     first_iteration
 copy_loop:
     tya
@@ -1373,6 +1375,7 @@ width_bytes_m1: .byte   3       ; width_byte - 1
 width:          .byte   28      ; width_bytes * 7
 width_m1:       .byte   27      ; width - 1
 height:         .byte   16
+height_m1:      .byte   15      ; height - 1
 length:         .byte   64      ; width_bytes * height
 
 ; Temporary
