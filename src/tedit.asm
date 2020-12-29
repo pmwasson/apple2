@@ -1142,12 +1142,12 @@ continue:
 .proc rotate_up
     lda     length
     clc
-    sbc     width_bytes     ; length-width)bytes-1
+    sbc     width_bytes     ; length-width_bytes-1
     sta     done_value
     sec
     sbc     width_bytes     ; length-width_bytes*2-1
     sta     next_column_value     
-    ; copyPtr = tilePtr + WIDTH_BYTES
+    ; copyPtr = tilePtr + width_bytes
     lda     tilePtr1
     sta     copyPtr1
     lda     tilePtr0
@@ -1194,14 +1194,22 @@ next_column_value:  .byte   0
 ; rotate_down
 ;-----------------------------------------------------------------------------
 .proc rotate_down
-    ; copyPtr = tilePtr + WIDTH_BYTES
+    ; copyPtr = tilePtr + width_bytes
     lda     tilePtr1
     sta     copyPtr1
     lda     tilePtr0
     clc
     adc     width_bytes
     sta     copyPtr0
-    ldy     #LENGTH-WIDTH_BYTES-1
+
+    lda     length
+    clc
+    sbc     width_bytes         ; length - width_bytes - 1
+    tay
+    sec
+    sbc     width_bytes         ; length - width_bytes*2 -1
+    sta     next_column_value
+
 column_loop:
     ; save first byte in temp    
     lda     (copyPtr0),y
@@ -1228,9 +1236,12 @@ first_iteration:
     ; next column
     tya
     clc
-    adc     #LENGTH-WIDTH_BYTES*2-1
+    adc     next_column_value
     tay
     jmp     column_loop
+
+next_column_value:  .byte   0
+
 .endproc
 
 ;-----------------------------------------------------------------------------
@@ -1241,7 +1252,7 @@ first_iteration:
 loop:
     lda     #0
     sta     prevSavedBit
-    ldx     #WIDTH_BYTES
+    ldx     width_bytes
 
 byte_loop:
     ; save color bit
@@ -1274,7 +1285,7 @@ byte_loop:
     sty     savedColor      ; save Y for next row
     tya
     sec
-    sbc     #WIDTH_BYTES
+    sbc     width_bytes
     tay
     lda     (tilePtr0),y
     ora     prevSavedBit
@@ -1297,7 +1308,7 @@ byte_loop:
 loop:
     lda     #0
     sta     prevSavedBit
-    ldx     #WIDTH_BYTES
+    ldx     width_bytes
 
 byte_loop:
     ; save color bit
@@ -1330,7 +1341,7 @@ byte_loop:
     sty     savedColor      ; save Y for next row
     tya
     clc
-    adc     #WIDTH_BYTES
+    adc     width_bytes
     tay
     lda     (tilePtr0),y
     ora     prevSavedBit
