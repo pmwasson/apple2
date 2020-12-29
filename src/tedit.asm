@@ -15,11 +15,16 @@ DIR_UP          =   2
 DIR_DOWN        =   3
 
 ; REMOVE!
-;PREVIEW_ADRS0   =   HGRPAGE1+$80*1+WIDTH+4
-;PREVIEW_ADRS1   =   HGRPAGE1+$28+$80*0         +WIDTH+2
-;PREVIEW_ADRS2   =   HGRPAGE1+$28+$80*0         +WIDTH+2+WIDTH_BYTES
-;PREVIEW_ADRS3   =   HGRPAGE1+$28+$80*(HEIGHT/8)+WIDTH+2
-;PREVIEW_ADRS4   =   HGRPAGE1+$28+$80*(HEIGHT/8)+WIDTH+2+WIDTH_BYTES
+WIDTH_BYTES     =   4
+HEIGHT_BYTES    =   16
+WIDTH           =   WIDTH_BYTES*7
+HEIGHT          =   HEIGHT_BYTES
+LENGTH          =   WIDTH_BYTES * HEIGHT_BYTES
+PREVIEW_ADRS0   =   HGRPAGE1+$80*1+WIDTH+4
+PREVIEW_ADRS1   =   HGRPAGE1+$28+$80*0         +WIDTH+2
+PREVIEW_ADRS2   =   HGRPAGE1+$28+$80*0         +WIDTH+2+WIDTH_BYTES
+PREVIEW_ADRS3   =   HGRPAGE1+$28+$80*(HEIGHT/8)+WIDTH+2
+PREVIEW_ADRS4   =   HGRPAGE1+$28+$80*(HEIGHT/8)+WIDTH+2+WIDTH_BYTES
 
 ;------------------------------------------------
 ; Zero page usage
@@ -887,8 +892,9 @@ xloop:
 
     ; upper-right
     ;---------------------------
-    lda     #WIDTH+1
+    lda     width
     sta     charX
+    inc     charX   ; width+1
     ;lda     #0
     ;sta     charY
     lda     #boarder_upper_right
@@ -896,8 +902,6 @@ xloop:
 
     ; lower-right
     ;---------------------------
-    ;lda     #WIDTH+1
-    ;sta     charX
     lda     #HEIGHT+1
     sta     charY
     lda     #boarder_lower_right
@@ -907,8 +911,6 @@ xloop:
     ;---------------------------
     lda     #0
     sta     charX
-    ;lda     #HEIGHT+1
-    ;sta     charY
     lda     #boarder_lower_left
     jsr     drawChar
 
@@ -929,9 +931,9 @@ hloop:
     jsr     drawChar
 
     inc     charX
-    lda     #WIDTH+1
+    lda     width
     cmp     charX
-    bne     hloop
+    bpl     hloop
  
     ; draw vertical
     ;---------------------------
@@ -944,8 +946,9 @@ vloop:
     lda     #boarder_vertical
     jsr     drawChar
 
-    lda     #WIDTH+1
+    lda     width
     sta     charX
+    inc     charX   ; width+1
     lda     #boarder_vertical
     jsr     drawChar
 
@@ -1003,16 +1006,16 @@ vloop:
 
     ldx     #HEIGHT_BYTES-1
 drawLoopV:
-    ldy     #WIDTH_BYTES-1
+    ldy     width_bytes_m1
 drawLoopH:
     lda     (tilePtr0),y
     sta     (screenPtr0),y
     dey
     bpl     drawLoopH
 
-    sec
+    clc
     lda     tilePtr0
-    adc     #WIDTH_BYTES-1
+    adc     width_bytes
     sta     tilePtr0
     ; assumes spritePtr aligned such that there are no page crossing
 
@@ -1137,12 +1140,19 @@ continue:
 ; rotate_up
 ;-----------------------------------------------------------------------------
 .proc rotate_up
+    lda     length
+    clc
+    sbc     width_bytes     ; length-width)bytes-1
+    sta     done_value
+    sec
+    sbc     width_bytes     ; length-width_bytes*2-1
+    sta     next_column_value     
     ; copyPtr = tilePtr + WIDTH_BYTES
     lda     tilePtr1
     sta     copyPtr1
     lda     tilePtr0
     clc
-    adc     #WIDTH_BYTES
+    adc     width_bytes
     sta     copyPtr0
     ldy     #0
 column_loop:
@@ -1154,7 +1164,7 @@ column_loop:
 copy_loop:
     tya
     clc
-    adc     #WIDTH_BYTES
+    adc     width_bytes
     tay
 first_iteration:    
     lda     (copyPtr0),y    ; source (dest+4)
@@ -1164,16 +1174,20 @@ first_iteration:
     lda     savedByte
     sta     (copyPtr0),y
     ; check if done (read last byte)
-    cpy     #LENGTH-WIDTH_BYTES-1
+    cpy     done_value
     bne     :+
     rts
 :
     ; next column
     tya
     sec
-    sbc     #LENGTH-WIDTH_BYTES*2-1
+    sbc     next_column_value
     tay
     jmp     column_loop
+
+done_value:         .byte   0
+next_column_value:  .byte   0
+
 .endproc
 
 ;-----------------------------------------------------------------------------
@@ -1185,7 +1199,7 @@ first_iteration:
     sta     copyPtr1
     lda     tilePtr0
     clc
-    adc     #WIDTH_BYTES
+    adc     width_bytes
     sta     copyPtr0
     ldy     #LENGTH-WIDTH_BYTES-1
 column_loop:
@@ -1197,7 +1211,7 @@ column_loop:
 copy_loop:
     tya
     sec
-    sbc     #WIDTH_BYTES
+    sbc     width_bytes
     tay
 first_iteration:    
     lda     (tilePtr0),y    ; source (dest-4)
@@ -1338,15 +1352,17 @@ curX:           .byte   0
 curY:           .byte   0       
 curData:        .byte   0
 tileIndex:      .byte   0
-tileMax:        .byte   48
+tileMax:        .byte   8
 sheetStart:     .word   example_start
 sheetEnd:       .word   example_end
 
 ; when changes size, all of the following need to be updated
-width_bytes     .byte   4       
-width           .byte   28      ; width_bytes * 7
-height          .byte   16
-length          .byte   64      ; width_bytes * height
+width_bytes:    .byte   4       
+width_bytes_m1: .byte   3       ; width_byte - 1       
+width:          .byte   28      ; width_bytes * 7
+width_m1:       .byte   27      ; width - 1
+height:         .byte   16
+length:         .byte   64      ; width_bytes * height
 
 ; Temporary
 
@@ -1392,7 +1408,7 @@ fill_color_odd:
 ; Put example tile last (in case user extends)
 ; and align
 
-.align  LENGTH
+.align  256
 
 example_start:
 water:
