@@ -40,7 +40,7 @@ copyPtr1    :=  $63
 
     ; display a greeting
     jsr     inline_print
-    .byte   "Tile editor v0.1 - ? for help",13,0
+    .byte   "Tile editor - ? for help",13,0
 
 reset:
     jsr     HGR         ; hi-res mixed mode
@@ -255,13 +255,13 @@ toggle_text_off:
     bne     :+
     bit     TXTSET
     jsr     inline_print
-    .byte   "Dump (ESC when done)",13,0
+    .byte   "Dump (ESC when done) ",0
 
     ldx     tilePtr0
     ldy     tilePtr1
     jsr     PRINTXY
     jsr     inline_print
-    .byte   ": ",0
+    .byte   ":",13,".byte ",0
 
     lda     #0
     sta     dump_count
@@ -283,7 +283,7 @@ dump_loop:
     and     #$7
     bne     dump_comma
     jsr     inline_print
-    .byte   13,"      ",0
+    .byte   13,".byte ",0
     jmp     dump_loop
 
 dump_finish:
@@ -519,6 +519,26 @@ sizeWidth:          .byte   7,14,14,28
 sizeWidthBytes:     .byte   1,2,2,4
 sizeLength:         .byte   8,16,32,64
 
+fill_color_even:
+    .byte   $00     ; 0 Black
+    .byte   $2A     ; 1 Green   - flip on odd bytes
+    .byte   $55     ; 2 Purple  - flip on odd bytes
+    .byte   $7F     ; 3 White
+    .byte   $80     ; 4 Black
+    .byte   $AA     ; 5 Orange  - flip on odd bytes
+    .byte   $D5     ; 6 Blue    - flip on odd bytes
+    .byte   $FF     ; 7 White
+
+fill_color_odd:
+    .byte   $00     ; 0 Black
+    .byte   $55     ; 1 Green   - flip on odd bytes
+    .byte   $2A     ; 2 Purple  - flip on odd bytes
+    .byte   $7F     ; 3 White
+    .byte   $80     ; 4 Black
+    .byte   $D5     ; 5 Orange  - flip on odd bytes
+    .byte   $AA     ; 6 Blue    - flip on odd bytes
+    .byte   $FF     ; 7 White
+
 .endproc ; tedit_main  
 
 ;-----------------------------------------------------------------------------
@@ -530,21 +550,18 @@ sizeLength:         .byte   8,16,32,64
     .byte   " Arrows: Move cursor",13
     .byte   " Arrows+open/close-apple: Clear/set bit",13
     .byte   " Space: Toggle bit",13
-    .byte   " C: Toggle byte color",13
-    .byte   " F: Fill tile color",13
-    .byte   " R: Rotate bits in a direction",13
-    .byte   " I: *Insert row/col",13
-    .byte   " D: *Delete row/col",13
-    .byte   " X: Flip all pixel bits",13
-    .byte   " Z: Flip all color bits",13
-    .byte   " !: Dump bytes",13
-    .byte   " L: *Load tile set",13
-    .byte   " S: *Save tile set",13
-    .byte   " N: New size",13
-    .byte   " -: Go to previous tile",13
-    .byte   " =: Go to next tile",13
-    .byte   " ?: HELP",13
-    .byte   " Q: Quit",13  
+    .byte   " C:   Toggle byte color",13
+    .byte   " F:   Fill tile color",13
+    .byte   " R:   Rotate bits in a direction",13
+    .byte   " I/D: *Insert/Delete row/col",13
+    .byte   " X/Z: Flip all pixel/color bits",13
+    .byte   " !:   Dump bytes",13
+    .byte   " L/S: *Load/save tile set",13
+    .byte   " N:   New size",13
+    .byte   " -/=: Go to previous/next tile",13
+    .byte   " ?:   HELP",13
+    .byte   " Q:   Quit",13  
+    .byte   " Tab: Switch tool",13
     .byte   " Escape: Toggle text/graphics",13
     .byte   "   * = unimplemented",13
     .byte   0
@@ -1392,14 +1409,15 @@ tileMax:        .byte   64
 sheetStart:     .word   example_start
 
 ; when changes size, all of the following need to be updated
-width_bytes:    .byte   1       
-width_bytes_m1: .byte   0       ; width_byte - 1       
-width:          .byte   7       ; width_bytes * 7
-width_m1:       .byte   6       ; width - 1
-height_bytes:   .byte   1
-height:         .byte   8       ; height_bytes * 8
-height_m1:      .byte   7       ; height - 1
-length:         .byte   8       ; width_bytes * height
+; Legal sizes: 7x8, 14x8, 14x16, 28x16
+width_bytes:    .byte   4       
+width_bytes_m1: .byte   3       ; width_byte - 1       
+width:          .byte   28      ; width_bytes * 7
+width_m1:       .byte   27      ; width - 1
+height_bytes:   .byte   2
+height:         .byte   16      ; height_bytes * 8
+height_m1:      .byte   15      ; height - 1
+length:         .byte   64      ; width_bytes * height
 
 ; Temporary
 
@@ -1416,168 +1434,12 @@ temp2:          .byte   0
 ; Data
 ;-----------------------------------------------------------------------------
 
-
-
-fill_color_even:
-    .byte   $00     ; 0 Black
-    .byte   $2A     ; 1 Green   - flip on odd bytes
-    .byte   $55     ; 2 Purple  - flip on odd bytes
-    .byte   $7F     ; 3 White
-    .byte   $80     ; 4 Black
-    .byte   $AA     ; 5 Orange  - flip on odd bytes
-    .byte   $D5     ; 6 Blue    - flip on odd bytes
-    .byte   $FF     ; 7 White
-
-fill_color_odd:
-    .byte   $00     ; 0 Black
-    .byte   $55     ; 1 Green   - flip on odd bytes
-    .byte   $2A     ; 2 Purple  - flip on odd bytes
-    .byte   $7F     ; 3 White
-    .byte   $80     ; 4 Black
-    .byte   $D5     ; 5 Orange  - flip on odd bytes
-    .byte   $AA     ; 6 Blue    - flip on odd bytes
-    .byte   $FF     ; 7 White
-
-
-
-
-
 ; Put example tile last (in case user extends)
 ; and align
 
 .align  256
 
 example_start:
-
-    ; @
-    .byte   $1E,$33,$33,$3B,$3B,$03,$3E,$00
-    ; A
-    .byte   $1E,$33,$33,$3F,$33,$33,$33,$00
-    ; B
-    .byte   $1F,$33,$33,$1F,$33,$33,$1F,$00
-    ; C
-    .byte   $1E,$33,$03,$03,$03,$33,$1E,$00
-    ; D
-    .byte   $1F,$33,$33,$33,$33,$33,$1F,$00
-    ; E
-    .byte   $3E,$06,$06,$1E,$06,$06,$3E,$00
-    ; F
-    .byte   $3E,$06,$06,$1E,$06,$06,$06,$00
-    ; G
-    .byte   $1E,$03,$03,$3B,$33,$33,$1E,$00
-    ; H
-    .byte   $33,$33,$33,$3F,$33,$33,$33,$00
-    ; I
-    .byte   $1E,$0C,$0C,$0C,$0C,$0C,$1E,$00
-    ; J
-    .byte   $30,$30,$30,$30,$30,$36,$1C,$00
-    ; K
-    .byte   $33,$3B,$1F,$0F,$1B,$33,$33,$00
-    ; L
-    .byte   $06,$06,$06,$06,$06,$06,$3E,$00
-    ; M
-    .byte   $33,$3F,$3F,$33,$33,$33,$33,$00
-    ; N
-    .byte   $33,$37,$37,$3F,$3B,$3B,$33,$00
-    ; O
-    .byte   $1E,$33,$33,$33,$33,$33,$1E,$00
-    ; P
-    .byte   $1F,$33,$33,$1F,$03,$03,$03,$00
-    ; Q
-    .byte   $1E,$33,$33,$33,$33,$1B,$3E,$00
-    ; R
-    .byte   $1F,$33,$33,$1F,$33,$33,$33,$00
-    ; S
-    .byte   $3C,$06,$06,$1C,$30,$30,$1E,$00
-    ; T
-    .byte   $3F,$0C,$0C,$0C,$0C,$0C,$0C,$00
-    ; U
-    .byte   $33,$33,$33,$33,$33,$33,$1E,$00
-    ; V
-    .byte   $33,$33,$33,$33,$33,$1E,$0C,$00
-    ; W
-    .byte   $33,$33,$33,$33,$3F,$3F,$33,$00
-    ; X
-    .byte   $33,$33,$1E,$0C,$1E,$33,$33,$00
-    ; Y
-    .byte   $33,$33,$33,$1E,$0C,$0C,$0C,$00
-    ; Z
-    .byte   $3E,$98,$18,$8C,$0C,$86,$3E,$00
-    ; [
-    .byte   $1E,$06,$06,$06,$06,$06,$1E,$00
-    ; \
-    .byte   $06,$86,$0C,$8C,$18,$98,$00,$00
-    ; ]
-    .byte   $1E,$18,$18,$18,$18,$18,$1E,$00
-    ; ^
-    .byte   $00,$0C,$1E,$33,$00,$00,$00,$00
-    ; _
-    .byte   $00,$00,$00,$00,$00,$00,$00,$7F
-    ; space
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    ; !
-    .byte   $0C,$0C,$0C,$0C,$0C,$00,$0C,$00
-    ; "
-    .byte   $B3,$33,$00,$00,$00,$00,$00,$00
-    ; #
-    .byte   $00,$36,$7F,$36,$36,$7F,$36,$00
-    ; $
-    .byte   $0C,$1E,$03,$1E,$30,$1E,$0C,$00
-    ; %
-    .byte   $03,$33,$18,$0C,$06,$33,$30,$00
-    ; &
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    ; '
-    .byte   $8C,$0C,$00,$00,$00,$00,$00,$00
-    ; (
-    .byte   $98,$8C,$0C,$0C,$0C,$8C,$98,$00
-    ; )
-    .byte   $0C,$18,$98,$98,$98,$18,$0C,$00
-    ; *
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    ; +
-    .byte   $00,$0C,$0C,$3F,$0C,$0C,$00,$00
-    ; ,
-    .byte   $00,$00,$00,$00,$8C,$8C,$0C,$00
-    ; -
-    .byte   $00,$00,$00,$1E,$00,$00,$00,$00
-    ; .
-    .byte   $00,$00,$00,$00,$00,$0C,$0C,$00
-    ; /
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    ; 0
-    .byte   $1E,$33,$33,$33,$33,$33,$1E,$00
-    ; 1
-    .byte   $0C,$0E,$0C,$0C,$0C,$0C,$1E,$00
-    ; 2
-    .byte   $1E,$30,$30,$1C,$06,$06,$3E,$00
-    ; 3
-    .byte   $1E,$30,$30,$1C,$30,$30,$1E,$00
-    ; 4
-    .byte   $33,$33,$33,$3F,$30,$30,$30,$00
-    ; 5
-    .byte   $3E,$06,$06,$1E,$30,$30,$1E,$00
-    ; 6
-    .byte   $1E,$33,$03,$1F,$33,$33,$1E,$00
-    ; 7
-    .byte   $3F,$98,$18,$8C,$0C,$86,$06,$00
-    ; 8
-    .byte   $1E,$33,$33,$1E,$33,$33,$1E,$00
-    ; 9
-    .byte   $1E,$33,$33,$3E,$30,$33,$1E,$00
-    ; :
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    ; ;
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    ; <
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    ; =
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    ; >
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-    ; ?
-    .byte   $00,$00,$00,$00,$00,$00,$00,$00
-example_end:
 
 water:
     .byte   $F5,$AF,$D5,$AA,$DD,$BA,$D5,$AA
@@ -1659,6 +1521,25 @@ trees:
     .byte   $28,$05,$2A,$01,$02,$D0,$80,$44   
     .byte   $0A,$D0,$80,$55,$2A,$55,$2A,$55   
 
-; example_end:
+planks:
+    .byte   $80,$80,$80,$80,$AA,$C5,$A2,$D5   
+    .byte   $AA,$C5,$AA,$C5,$AA,$C5,$AA,$D5   
+    .byte   $A2,$C5,$AA,$D4,$AA,$C4,$A8,$D5   
+    .byte   $AA,$C5,$AA,$C5,$80,$80,$80,$80   
+    .byte   $80,$80,$80,$80,$AA,$D4,$8A,$D5   
+    .byte   $AA,$D5,$88,$C5,$AA,$D5,$8A,$D5   
+    .byte   $A2,$C5,$8A,$D5,$AA,$D5,$8A,$D1   
+    .byte   $AA,$D5,$8A,$D5,$80,$80,$80,$80   
+
+guy:
+    .byte   $80,$00,$00,$80,$80,$28,$05,$80   
+    .byte   $80,$7C,$1F,$80,$80,$74,$1B,$80   
+    .byte   $80,$3C,$1F,$80,$80,$7C,$1F,$80   
+    .byte   $80,$0C,$18,$80,$00,$F8,$8F,$00   
+    .byte   $56,$62,$53,$1A,$56,$0A,$54,$1A   
+    .byte   $00,$28,$15,$00,$80,$28,$15,$80   
+    .byte   $80,$50,$0A,$80,$80,$10,$08,$80   
+    .byte   $80,$3C,$1E,$80,$80,$00,$00,$80   
+
 
 .endproc ; tedit
