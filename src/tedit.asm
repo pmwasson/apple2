@@ -14,18 +14,6 @@ DIR_RIGHT       =   1
 DIR_UP          =   2
 DIR_DOWN        =   3
 
-; REMOVE!
-WIDTH_BYTES     =   1
-HEIGHT_BYTES    =   8
-WIDTH           =   WIDTH_BYTES*7
-HEIGHT          =   HEIGHT_BYTES
-LENGTH          =   WIDTH_BYTES * HEIGHT_BYTES
-PREVIEW_ADRS0   =   HGRPAGE1+$80*1+WIDTH+4
-PREVIEW_ADRS1   =   HGRPAGE1+$28+$80*0         +WIDTH+2
-PREVIEW_ADRS2   =   HGRPAGE1+$28+$80*0         +WIDTH+2+WIDTH_BYTES
-PREVIEW_ADRS3   =   HGRPAGE1+$28+$80*(HEIGHT/8)+WIDTH+2
-PREVIEW_ADRS4   =   HGRPAGE1+$28+$80*(HEIGHT/8)+WIDTH+2+WIDTH_BYTES
-
 ;------------------------------------------------
 ; Zero page usage
 ;------------------------------------------------
@@ -923,19 +911,51 @@ xloop:
     inc     charBottom
     jsr     drawBox
 
-    ; live window
+    ; tile preview
     lda     charRight
-    clc
-    adc     #2
     sta     charLeft
     sec
     adc     width_bytes
+    clc
+    adc     width_bytes
     sta     charRight
     lda     height_bytes
-    sta     charBottom
-    inc     charBottom
+    clc
+    adc     #1
+    sta     charTop
+    adc     height_bytes
+    sec
+    adc     height_bytes
+    sta     charBottom    
+    lda     #boarder_t_right
+    sta     charTL
+    sta     charBL
     jsr     drawBox
 
+    ; live window
+    lda     charLeft
+    sec
+    adc     width_bytes
+    sta     charRight
+    lda     charTop
+    sta     charBottom
+    lda     #0
+    sta     charTop
+    lda     #boarder_t_down
+    sta     charTL
+    lda     #boarder_t_right
+    sta     charBL
+    lda     #boarder_t_up
+    sta     charBR
+    jsr     drawBox
+
+    ; restore box corners
+    lda     #boarder_upper_left
+    sta     charTL
+    lda     #boarder_lower_left
+    sta     charBL
+    lda     #boarder_lower_right
+    sta     charBR
     rts
 
 .endproc
@@ -944,35 +964,57 @@ xloop:
 ; drawPreview
 ;-----------------------------------------------------------------------------
 .proc drawPreview
-    ; set screenPtr to fixed location
+    ; x=width+2, y=1
     ldx     #1
     lda     width
     clc
-    adc     #4
+    adc     #2
     jsr     setScreenPtr
     jsr     drawShape
 
+    ; x=width+2, y=height_bytes+2
+    clc
+    lda     height_bytes
+    adc     #2
+    tax
+    lda     width
+    adc     #2
+    jsr     setScreenPtr
+    jsr     drawShape
 
-;    lda     #<PREVIEW_ADRS1
-;    sta     screenPtr0
-;    lda     #>PREVIEW_ADRS1
-;    sta     screenPtr1
-;    jsr     drawShape
-;    lda     #<PREVIEW_ADRS2
-;    sta     screenPtr0
-;    lda     #>PREVIEW_ADRS2
-;    sta     screenPtr1
-;    jsr     drawShape
-;    lda     #<PREVIEW_ADRS3
-;    sta     screenPtr0
-;    lda     #>PREVIEW_ADRS3
-;    sta     screenPtr1
-;    jsr     drawShape
-;    lda     #<PREVIEW_ADRS4
-;    sta     screenPtr0
-;    lda     #>PREVIEW_ADRS4
-;    sta     screenPtr1
-;    jsr     drawShape
+    ; x=width+2+width_bytes, y=height_bytes+2
+    clc
+    lda     height_bytes
+    adc     #2
+    tax
+    lda     width
+    adc     width_bytes
+    adc     #2
+    jsr     setScreenPtr
+    jsr     drawShape
+
+    ; x=width+2, y=height_bytes*2+2
+    clc
+    lda     height_bytes
+    asl
+    adc     #2
+    tax
+    lda     width
+    adc     #2
+    jsr     setScreenPtr
+    jsr     drawShape
+
+    ; x=width+2+width_bytes, y=height_bytes*2+2
+    clc
+    lda     height_bytes
+    asl
+    adc     #2
+    tax
+    lda     width
+    adc     width_bytes
+    adc     #2
+    jsr     setScreenPtr
+    jsr     drawShape
 
     rts
 .endproc

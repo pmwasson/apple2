@@ -128,28 +128,28 @@ printExit:
     sta     charX
     lda     charTop
     sta     charY
-    lda     #boarder_upper_left
+    lda     charTL
     jsr     drawChar
 
     ; upper-right
     ;---------------------------
     lda     charRight
     sta     charX
-    lda     #boarder_upper_right
+    lda     charTR
     jsr     drawChar
 
     ; lower-right
     ;---------------------------
     lda     charBottom
     sta     charY
-    lda     #boarder_lower_right
+    lda     charBR
     jsr     drawChar
 
     ; lower-left
     ;---------------------------
     lda     charLeft
     sta     charX
-    lda     #boarder_lower_left
+    lda     charBL
     jsr     drawChar
 
     ; draw horizontal
@@ -210,6 +210,11 @@ charLeft:   .byte   0
 charTop:    .byte   0
 charRight:  .byte   0
 charBottom: .byte   0
+charTL:     .byte   boarder_upper_left
+charTR:     .byte   boarder_upper_right
+charBL:     .byte   boarder_lower_left
+charBR:     .byte   boarder_lower_right
+
 
 lineOffset:
     .byte   <$2000
@@ -410,11 +415,11 @@ boarder_start = 64
 boarder_upper_left = boarder_start + 0
     .byte   $00,$00,$00,$78,$FC,$3C,$1C,$1C
 boarder_horizontal = boarder_start + 1
-    .byte   $00,$00,$00,$7F,$FF,$00,$00,$00
+    .byte   $00,$00,$00,$7F,$7F,$00,$00,$00
 boarder_horizontal_r = boarder_start + 2
-    .byte   $00,$00,$40,$7F,$FF,$40,$00,$00
+    .byte   $00,$00,$40,$7F,$7F,$40,$00,$00
 boarder_horizontal_l = boarder_start + 3
-    .byte   $00,$00,$01,$7F,$FF,$01,$00,$00
+    .byte   $00,$00,$01,$7F,$7F,$01,$00,$00
 boarder_upper_right = boarder_start + 4
     .byte   $00,$00,$00,$0F,$8F,$1E,$1C,$1C
 boarder_vertical = boarder_start + 5
