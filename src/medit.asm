@@ -3,6 +3,14 @@
 ;-----------------------------------------------------------------------------
 ; medit - Map editor
 
+;------------------------------------------------
+; Zero page usage
+;------------------------------------------------
+
+; tilePtr0    :=  $60     ; Tile pointer
+; tilePtr1    :=  $61
+; screenPtr0  :=  $52     ; Screen pointer
+; screenPtr1  :=  $53
 
 ;-----------------------------------------------------------------------------
 ; Map Edit
@@ -21,7 +29,15 @@
     .byte   "Map editor - ? for help",13,0
 
     jsr 	HGR
+
+    lda 	#4
+    sta 	mapX
+    sta 	mapY
+    lda 	#3
+    jsr 	drawTile
+
     jsr 	drawBackground
+    jsr 	drawMap
 
 command_loop:
 
@@ -114,11 +130,62 @@ toggle_text_off:
     lda     #1
     sta     charTop
     sta     charLeft
-    lda 	#16
+    lda 	#18
     sta     charBottom
-    lda 	#32
+    lda 	#38
     sta     charRight
     jsr     drawBox
+
+    rts
+.endproc
+
+;-----------------------------------------------------------------------------
+; drawMap
+;-----------------------------------------------------------------------------
+.proc drawMap
+
+	lda 	#2
+	sta 	mapY
+
+vloop:
+	lda 	#2
+	sta 	mapX
+
+hloop:
+
+;--- temp junk
+	lda 	mapY
+	cmp 	mapX
+	beq 	:+
+	lda 	#0
+	adc 	#0
+	jmp		skip
+:
+	lda 	#2
+skip:
+;----
+	jsr 	drawTile
+
+	clc
+	lda 	mapX
+	adc		#4
+	sta 	mapX
+	cmp 	#38
+	bmi 	hloop
+
+	clc
+	lda 	mapY
+	adc		#2
+	sta 	mapY
+	cmp 	#18
+	bmi 	vloop
+
+	;
+	lda 	#0
+	sta 	charX
+	sta 	charY
+	jsr		drawString
+	.byte 	"LOC:00,00",0
 
     rts
 .endproc
@@ -127,18 +194,151 @@ toggle_text_off:
 ; drawTile
 ;-----------------------------------------------------------------------------
 .proc drawTile
+    ; calculate sprite pointer
+    sta     temp0           ; Save a copy of A
 
-    ; edit window
-    lda     #1
-    sta     charTop
-    sta     charLeft
-    lda 	#16
-    sta     charBottom
-    lda 	#32
-    sta     charRight
-    jsr     drawBox
+    ror
+    ror
+    ror                     ; Multiply by 64
+    and 	#$c0
+    clc
+    adc     tileSheetStart
+    sta     tilePtr0
 
-    rts
+    lda     #0
+    adc     tileSheetStart+1
+    sta     tilePtr1
+    lda     temp0
+    lsr
+    lsr                     ; Divide by 4
+
+    clc
+    adc     tilePtr1
+    sta     tilePtr1
+
+    ; calculate screen pointer
+    ldx     mapY
+    lda     mapX
+    clc
+    adc     lineOffset,x    ; + lineOffset
+    sta     screenPtr0    
+    lda     linePage,x
+    sta     screenPtr1
+
+    clc     ; Carry not set in loop, so clear outside of loop
+    ldx     #$08
+drawLoop1:
+    ldy     #0
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #1
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #2
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #3
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+
+    ; assumes aligned such that there are no page crossing
+    lda 	tilePtr0
+    adc 	#4
+    sta 	tilePtr0
+
+    lda     screenPtr1
+    adc     #4
+    sta     screenPtr1
+
+    dex
+    bne     drawLoop1
+
+    ; move to next byte
+    lda     screenPtr0
+    clc
+    adc     #$80
+    sta     screenPtr0
+    lda     screenPtr1
+    sbc     #$1f        ; subtract 20 if no carry, 19 if carry
+    sta     screenPtr1
+
+    clc     ; Carry not set in loop, so clear outside of loop
+    ldx     #$08
+drawLoop2:
+    ldy     #0
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #1
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #2
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+    ldy     #3
+    lda     (tilePtr0),y
+    sta     (screenPtr0),y
+
+    ; assumes aligned such that there are no page crossing
+    lda 	tilePtr0
+    adc 	#4
+    sta 	tilePtr0
+
+    lda     screenPtr1
+    adc     #4
+    sta     screenPtr1
+
+    dex
+    bne     drawLoop2
+
+    rts    
+
+; locals
+temp0:  .byte   0
+
 .endproc
+
+;-----------------------------------------------------------------------------
+; data
+;-----------------------------------------------------------------------------
+
+mapX: 	.byte 	0
+mapY:	.byte 	0
+
+.align  256
+
+; 32x32 map
+map:
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 
 .endproc
