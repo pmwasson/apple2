@@ -48,6 +48,8 @@ reset:
     sta     tilePtr0
     lda     tileSheetStart+1
     sta     tilePtr1
+    lda     #0
+    sta     tileIndex
 
     ; Init cursor
     lda     #0
@@ -443,8 +445,6 @@ new_continue:
     lda     sizeLength,x
     sta     length    
     ; Reset
-    lda     #0
-    sta     tileIndex
     jsr     CR
     jmp     reset
 :
@@ -1452,13 +1452,13 @@ tileSheetStart:     .word   example_tiles
 example_tiles:
 
 water:
-    .byte   $F5,$AF,$D5,$AA,$DD,$BA,$D5,$AA
-    .byte   $D7,$EA,$D5,$AA,$D5,$AA,$D7,$EA
-    .byte   $D5,$AA,$DD,$BA,$D5,$AA,$F5,$AF
     .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA
-    .byte   $D5,$FA,$D7,$AA,$D5,$AE,$DD,$AA
-    .byte   $D5,$AB,$F5,$AA,$F5,$AA,$D5,$AB
-    .byte   $DD,$AA,$D5,$AE,$D7,$AA,$D5,$FA
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA
     .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA
 
 grass:   
@@ -1472,14 +1472,14 @@ grass:
     .byte   $2A,$55,$2A,$55,$2A,$55,$2A,$55
 
 bricks:   
-    .byte   $EA,$D5,$AE,$D5,$EA,$D5,$AE,$D5
-    .byte   $EA,$D5,$AE,$D5,$EA,$D5,$AE,$D5
-    .byte   $FF,$FF,$FF,$FF,$AA,$DD,$AA,$F5
-    .byte   $AA,$DD,$AA,$F5,$AA,$DD,$AA,$F5
-    .byte   $AA,$DD,$AA,$F5,$AA,$DD,$AA,$F5
-    .byte   $FF,$FF,$FF,$FF,$AB,$D5,$EA,$D5
-    .byte   $AB,$D5,$EA,$D5,$AB,$D5,$EA,$D5
-    .byte   $AB,$D5,$EA,$D5,$FF,$FF,$FF,$FF
+    .byte   $AA,$DD,$EA,$D5,$AA,$DD,$EA,$D5
+    .byte   $AA,$DD,$EA,$D5,$AA,$DD,$EA,$D5
+    .byte   $FF,$FF,$FF,$FF,$AE,$D5,$AB,$D5
+    .byte   $AE,$D5,$AB,$D5,$AE,$D5,$AB,$D5
+    .byte   $AE,$D5,$AB,$D5,$AE,$D5,$AB,$D5
+    .byte   $FF,$FF,$FF,$FF,$BA,$D5,$AA,$DD
+    .byte   $BA,$D5,$AA,$DD,$BA,$D5,$AA,$DD
+    .byte   $BA,$D5,$AA,$DD,$FF,$FF,$FF,$FF
 
 frog1:
     .byte   $80,$80,$80,$80,$20,$15,$28,$05   
@@ -1551,6 +1551,82 @@ guy:
     .byte   $80,$50,$0A,$80,$80,$10,$08,$80   
     .byte   $80,$3C,$1E,$80,$80,$00,$00,$80   
 
+shore:     
+    .byte   $2A,$55,$2A,$55,$2A,$55,$2A,$55   
+    .byte   $2A,$55,$2A,$55,$2A,$55,$2A,$55   
+    .byte   $2A,$55,$2A,$55,$2A,$55,$2A,$55   
+    .byte   $80,$80,$80,$80,$8A,$D4,$A8,$C5   
+    .byte   $AF,$F1,$AF,$FC,$F5,$AF,$F5,$AB   
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA   
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA   
+    .byte   $D5,$AA,$D5,$AA,$D5,$AA,$D5,$AA   
+                               
+door_close:    
+    .byte   $AA,$FF,$FF,$D5,$EA,$81,$80,$D7   
+    .byte   $EA,$D4,$AA,$D6,$BA,$C4,$AA,$DC   
+    .byte   $9F,$D5,$A2,$F9,$9A,$80,$80,$D8   
+    .byte   $9A,$D5,$AA,$D9,$9A,$95,$AA,$D9   
+    .byte   $9A,$D1,$BA,$D9,$9A,$D5,$F8,$D9   
+    .byte   $9F,$D5,$AA,$F9,$9A,$80,$80,$D8   
+    .byte   $9A,$D5,$AA,$D9,$9A,$D1,$A2,$D9   
+    .byte   $9A,$D5,$AA,$D9,$9F,$80,$80,$F8                          
+
+door_open:
+    .byte   $AA,$FF,$FF,$D5,$EA,$81,$80,$D7   
+    .byte   $EA,$94,$80,$D6,$BA,$84,$80,$DC   
+    .byte   $9F,$91,$80,$F8,$9A,$B4,$E0,$D9   
+    .byte   $9A,$95,$80,$D8,$9A,$85,$FC,$D9   
+    .byte   $9A,$91,$80,$D8,$9A,$94,$80,$D8   
+    .byte   $9F,$85,$FF,$F8,$9A,$85,$80,$D8   
+    .byte   $9A,$81,$80,$D8,$9A,$81,$80,$D8   
+    .byte   $9A,$F0,$BF,$D8,$9F,$80,$80,$F8   
+
+; blank tiles
+
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
+    .byte   $00,$00,$00,$00,$00,$00,$00,$00
 example_tiles_end:
 
 

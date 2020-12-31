@@ -11,6 +11,8 @@
 ; tilePtr1    :=  $61
 ; screenPtr0  :=  $52     ; Screen pointer
 ; screenPtr1  :=  $53
+mapPtr0		:=	$68
+mapPtr1		:=	$69
 
 ;-----------------------------------------------------------------------------
 ; Map Edit
@@ -144,6 +146,11 @@ toggle_text_off:
 ;-----------------------------------------------------------------------------
 .proc drawMap
 
+	lda 	#<map
+	sta 	mapPtr0
+	lda 	#>map
+	sta 	mapPtr1
+
 	lda 	#2
 	sta 	mapY
 
@@ -151,20 +158,15 @@ vloop:
 	lda 	#2
 	sta 	mapX
 
-hloop:
-
-;--- temp junk
-	lda 	mapY
-	cmp 	mapX
-	beq 	:+
 	lda 	#0
-	adc 	#0
-	jmp		skip
-:
-	lda 	#2
-skip:
-;----
+	sta 	xoffset
+
+hloop:
+	ldy 	xoffset
+	lda		(mapPtr0),y
+	and 	#$3f
 	jsr 	drawTile
+	inc 	xoffset
 
 	clc
 	lda 	mapX
@@ -172,6 +174,14 @@ skip:
 	sta 	mapX
 	cmp 	#38
 	bmi 	hloop
+
+	clc
+	lda 	mapPtr0
+	adc 	#32
+	sta 	mapPtr0
+	lda 	mapPtr1
+	adc 	#0
+	sta 	mapPtr1
 
 	clc
 	lda 	mapY
@@ -185,9 +195,12 @@ skip:
 	sta 	charX
 	sta 	charY
 	jsr		drawString
-	.byte 	"LOC:00,00",0
+	.byte 	"LOC:01,23",0
 
     rts
+
+ xoffset:	.byte 	0
+
 .endproc
 
 ;-----------------------------------------------------------------------------
@@ -308,16 +321,16 @@ mapY:	.byte 	0
 
 ; 32x32 map
 map:
-	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	.byte "A@@@@GBLBGGGGGAAAAA@@@@@@@@@@@@@"
+	.byte "A@@@AGAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	.byte "A@@@AAGAGGGGGGAAAA@@@@@@@@@@@@@@"
+	.byte "A@@@AGGAAAAAAAAAAAA@@@@@@@@@@@@@"
+	.byte "AA@@AABBBBAAAAAAAAAAA@@@@@@@@@@@"
+	.byte "AAHHAIBKBAABAAAAAAAA@@@@@@@@@@@@"
+	.byte "AAEEAAAAAAAAAAAAAAAAA@@@@@@@@@@@"
+	.byte "AA@@JJAABAAAAAAAAAA@@@@@@@@@@@@@"
+	.byte "A@@@@@AABAAAAAAAAA@@@@@@@@@@@@@@"
+	.byte "@@@@@@JJJJJJJJJJJJ@@@@@@@@@@@@@@"
 	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 	.byte "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
