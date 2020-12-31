@@ -7,4 +7,5 @@ AppleCommander to build disk images. https://applecommander.github.io/
 
 AppleWin for emulation. https://github.com/AppleWin/AppleWin
 
+Will be trying to get running on the Rasberry Pi 400
 
