@@ -7,11 +7,16 @@
 ; Constants
 ;------------------------------------------------
 
+; memory map
+FILEBUFFER      =   $800        ; PRODOS filebuffer
+TILESHEET       =   $6000
+TILESHEET_SIZE  =   $1000
+
 DIR_LEFT        =   0
 DIR_RIGHT       =   1
 DIR_UP          =   2
 DIR_DOWN        =   3
-
+        
 ;------------------------------------------------
 ; Zero page usage
 ;------------------------------------------------
@@ -171,14 +176,34 @@ toggle_color_on:
     jmp     display_byte
 :
     ;------------------
-    ; Q = QUIT
+    ; Q = QUIT (mon)
+    ;------------------
+    cmp     #$80 | '*'
+    bne     :+
+    jsr     inline_print
+    .byte   "Quit (mon)",13,0
+    bit     TXTSET
+    jmp     MONZ    ; enter monitor
+:
+    ;------------------
+    ; Q = QUIT (prodos)
     ;------------------
     cmp     #$80 | 'Q'
     bne     :+
     jsr     inline_print
-    .byte   "Quit",13,0
+    .byte   "Quit (prodos)",13,0
     bit     TXTSET
-    jmp     MONZ        ; enter monitor
+    jsr     MLI
+    .byte   CMD_QUIT
+    .word   quit_params
+    brk             ; shouldn't get here!
+    
+quit_params:
+    .byte   $4      ;
+    .byte   $0      ; reserved
+    .word   $0      ; reserved
+    .byte   $0      ; reserved
+    .word   $0      ; reserved
 
 :
     ;------------------
@@ -457,7 +482,41 @@ new_continue:
     jsr     inline_print
     .byte   "Switch tool",13,0
     rts
+:
 
+    ;------------------
+    ; L = load
+    ;------------------
+    cmp     #$80 + 'L'
+    bne     :+
+    jsr     inline_print
+    .byte   "Load slot (0-7):",0
+    lda     #8
+    jsr     get_input_number
+    bmi     load_exit
+    jsr     load_sheet
+
+    ; redraw the screen
+    jsr     reset
+
+load_exit:
+    jmp     command_loop
+:    
+
+    ;------------------
+    ; S = save
+    ;------------------
+    cmp     #$80 + 'S'
+    bne     :+
+    jsr     inline_print
+    .byte   "Save slot (0-7):",0
+    lda     #8
+    jsr     get_input_number
+    bmi     save_exit
+    jsr     save_sheet
+save_exit:
+    jmp     command_loop
+:    
     ;------------------
     ; Unknown
     ;------------------
@@ -558,17 +617,15 @@ fill_color_odd:
     .byte   " C:   Toggle byte color",13
     .byte   " F:   Fill tile color",13
     .byte   " R:   Rotate bits in a direction",13
-    .byte   " I/D: *Insert/Delete row/col",13
     .byte   " X/Z: Flip all pixel/color bits",13
     .byte   " !:   Dump bytes",13
-    .byte   " L/S: *Load/save tile set",13
+    .byte   " L/S: Load/save tile set",13
     .byte   " N:   New size",13
     .byte   " -/=: Go to previous/next tile",13
     .byte   " ?:   This help screen",13
     .byte   " Q:   Quit",13  
     .byte   " Tab: Switch tool",13
     .byte   " Escape: Toggle text/graphics",13
-    .byte   "   * = unimplemented",13
     .byte   0
     rts
 .endproc
@@ -1403,6 +1460,195 @@ byte_loop:
 .endproc
 
 ;-----------------------------------------------------------------------------
+; load_sheet
+;-----------------------------------------------------------------------------
+.proc load_sheet
+
+    ; set filename
+    clc
+    adc     #'0'
+    sta     pathname+8
+
+    jsr     CR
+
+    ; open file
+    jsr     MLI
+    .byte   CMD_OPEN
+    .word   open_params
+    bcc     :+
+
+    jsr    PRBYTE
+    jsr    inline_print
+    .byte  ":unable to open file",13,0
+    rts
+:
+    jsr    inline_print
+    .byte  "File open",13,0
+
+    ; set reference number 
+    lda     open_params+5
+    sta     read_params+1
+    sta     close_params+1
+
+    ; read data
+    jsr    MLI
+    .byte  CMD_READ
+    .word  read_params
+    bcc    :+
+
+    jsr    PRBYTE
+    jsr    inline_print
+    .byte  ":unable to read data",13,0
+:
+    jsr    inline_print
+    .byte  "Data read",13,0
+
+    jsr    MLI
+    .byte  CMD_CLOSE
+    .word  close_params
+    bcc    :+
+    jsr    PRBYTE
+    jsr    inline_print
+    .byte  ":unable to close file",13,0
+:
+    jsr    inline_print
+    .byte  "Load complete",13,0
+
+    rts
+    
+open_params:
+    .byte   $3
+    .word   pathname      
+    .word   FILEBUFFER
+    .byte   $0                  ; reference number
+
+pathname:
+    .byte   8,"TILESET0"
+
+read_params:
+    .byte   $4
+    .byte   $0                  ; reference number
+    .word   TILESHEET           ; address of data buffer
+    .word   TILESHEET_SIZE      ; number of bytes to read
+    .word   $0                  ; number of bytes read
+
+close_params:
+    .byte   $1
+    .byte   $0                  ; reference number
+
+.endproc
+
+;-----------------------------------------------------------------------------
+; save_sheet
+;-----------------------------------------------------------------------------
+.proc save_sheet
+
+    ; set filename
+    clc
+    adc     #'0'
+    sta     pathname+8
+
+    jsr     CR
+
+    ; open file
+    jsr     MLI
+    .byte   CMD_OPEN
+    .word   open_params
+    bcc     open_good
+    
+    jsr    PRBYTE
+    jsr    inline_print
+    .byte  ":unable to open file, creating new",13,0
+
+    ; create file
+     jsr     MLI
+    .byte   CMD_CREATE
+    .word   create_params
+    bcc     :+   
+
+    jsr    PRBYTE
+    jsr    inline_print
+    .byte  ":unable to create file",13,0
+    rts    ; give up!
+:
+
+    ; open file again!
+    jsr     MLI
+    .byte   CMD_OPEN
+    .word   open_params
+    bcc     open_good
+
+    jsr    PRBYTE
+    jsr    inline_print
+    .byte  ":still unable to open file",13,0
+    rts    ; give up
+
+open_good:
+    jsr    inline_print
+    .byte  "File open",13,0
+
+    ; set reference number 
+    lda     open_params+5
+    sta     write_params+1
+    sta     close_params+1
+
+    ; write data
+    jsr    MLI
+    .byte  CMD_WRITE
+    .word  write_params
+    bcc    :+
+    jsr    PRBYTE
+    jsr    inline_print
+    .byte  ":unable to write data",13,0
+:
+    jsr    inline_print
+    .byte  "Data written",13,0
+
+    jsr    MLI
+    .byte  CMD_CLOSE
+    .word  close_params
+    bcc    :+
+    jsr    PRBYTE
+    jsr    inline_print
+    .byte  ":unable to close file",13,0
+:
+    jsr    inline_print
+    .byte  "Save complete",13,0
+
+    rts
+    
+open_params:
+    .byte   $3
+    .word   pathname      
+    .word   FILEBUFFER
+    .byte   $0                  ; reference number
+
+pathname:
+    .byte   8,"TILESET0"
+
+create_params:
+    .byte   $7
+    .word   pathname
+    .byte   $C3                 ; access bits (full access)
+    .byte   $6                  ; file type (binary)
+    .word   TILESHEET
+    .byte   $1                  ; storage type (standard)
+    .word   $0                  ; creation date
+    .word   $0                  ; creation time
+
+write_params:
+    .byte   $4
+    .byte   $0                  ; reference number
+    .word   TILESHEET           ; address of data buffer
+    .word   TILESHEET_SIZE      ; number of bytes to write
+    .word   $0                  ; number of bytes written
+
+close_params:
+    .byte   $1
+    .byte   $0                  ; reference number
+
+.endproc
+;-----------------------------------------------------------------------------
 ; Class variables
 ;-----------------------------------------------------------------------------
 
@@ -1440,7 +1686,7 @@ temp2:          .byte   0
 ; Global variables
 ;-----------------------------------------------------------------------------
 
-tileSheetStart:     .word   example_tiles
+tileSheetStart:     .word   TILESHEET
 
 ;-----------------------------------------------------------------------------
 ; Data
