@@ -564,7 +564,7 @@ fill_color_odd:
     .byte   " L/S: *Load/save tile set",13
     .byte   " N:   New size",13
     .byte   " -/=: Go to previous/next tile",13
-    .byte   " ?:   HELP",13
+    .byte   " ?:   This help screen",13
     .byte   " Q:   Quit",13  
     .byte   " Tab: Switch tool",13
     .byte   " Escape: Toggle text/graphics",13
